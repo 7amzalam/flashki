@@ -1,0 +1,16 @@
+{
+  "name": "flashki",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Flashki — smart flashcards (Tauri 2 desktop app)",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icon": "tauri icon src-tauri/icons/app-icon.png",
+    "web": "npx --yes serve src -l 5173"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

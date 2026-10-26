@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Flashki",
+  "version": "1.0.0",
+  "identifier": "com.flashki.app",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Flashki — بطاقاتك الذكية",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 420,
+        "minHeight": 640,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Education",
+    "shortDescription": "بطاقاتك الذكية — مراجعة متباعدة محلية بالكامل",
+    "longDescription": "Flashki is a fully local flashcard app with spaced repetition (SM-2), offline TTS, voice recording, and AI card generation via Google Gemini. All data stays on your device.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/USERNAME/flashki/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZFRUVEOUU2QjFDQjQxMDMKUldRRFFjdXg1dG51L2hKaHJyekxzb0p3S1d6cmVxTUFTZ0dCQnhpblBBaWhGSmVRQ1FlTnBSemkK"
+    }
+  }
+}
