@@ -1,43 +1,43 @@
-# Flashki — تطبيق البطاقات الذكية (Tauri 2)
+# Flashki — Smart Flashcard App (Tauri 2)
 
-تطبيق بطاقات مراجعة متباعدة (Spaced Repetition) **محلي بالكامل**: كل بياناتك مخزّنة على جهازك، بدون سيرفر، مع توليد بطاقات بالذكاء الاصطناعي (Google Gemini فقط) عبر نواة خلفية داخل التطبيق.
+A **fully local** spaced repetition flashcard app: all your data is stored on your device, serverless, with AI card generation (Google Gemini only) via an in-app backend core.
 
-## البنية التقنية
+## Technical Architecture
 
-| الطبقة | التقنية |
+| Layer | Technology |
 |---|---|
-| الواجهة | HTML/CSS/JS خالص (تصميمك الأصلي) |
-| التخزين | IndexedDB محلية على جهاز المستخدم |
-| الخوارزمية | SM-2 للمراجعة المتباعدة (نمط Anki) |
-| الخادم الخلفي للذكاء الاصطناعي | نواة Rust داخل التطبيق تتصل بـ Gemini فقط |
-| التغليف | Tauri 2 (Windows · Linux · macOS · Android لاحقاً) |
+| Frontend | Pure HTML/CSS/JS (Original design) |
+| Storage | Local IndexedDB on user device |
+| Algorithm | SM-2 for spaced repetition (Anki style) |
+| AI Backend | In-app Rust core connecting to Gemini only |
+| Packaging | Tauri 2 (Windows · Linux · macOS · Android soon) |
 
 ```
 flashki/
-├── src/                 ← الواجهة (frontend)
+├── src/                 ← Frontend
 │   ├── index.html
-│   ├── css/             ← التنسيقات + الخطوط المحلية (Tajawal)
-│   ├── js/              ← المنطق: db, srs, store, tts, audio, ai, render, handlers, app
+│   ├── css/             ← Styles + Local fonts (Tajawal)
+│   ├── js/              ← Logic: db, srs, store, tts, audio, ai, render, handlers, app
 │   └── assets/fonts/
-├── src-tauri/           ← نواة Tauri (Rust)
-│   ├── src/main.rs      ← نقطة الدخول
-│   ├── src/lib.rs       ← أمر gemini_generate (الاتصال بـ Gemini من الخلف)
-│   ├── tauri.conf.json  ← إعدادات النافذة والحزمة
-│   ├── capabilities/    ← صلاحيات النافذة
-│   └── icons/           ← أيقونات التطبيق (كل المقاسات)
+├── src-tauri/           ← Tauri core (Rust)
+│   ├── src/main.rs      ← Entry point
+│   ├── src/lib.rs       ← gemini_generate command (Connecting to Gemini from backend)
+│   ├── tauri.conf.json  ← Window and bundle settings
+│   ├── capabilities/    ← Window permissions
+│   └── icons/           ← App icons (all sizes)
 └── package.json
 ```
 
 ---
 
-## 1) تثبيت المتطلبات (مرة واحدة فقط)
+## 1) Prerequisites Installation (One-time only)
 
 ### Windows
-1. **Microsoft Edge WebView2** — مثبت مسبقاً في Windows 11 وWindows 10 المحدَّث.
-2. **Rust**: حمّل `rustup-init.exe` من https://rustup.rs وشغّله.
-3. **Node.js 20+**: من https://nodejs.org (نسخة LTS).
-4. **Visual Studio Build Tools**: من https://visualstudio.microsoft.com/visual-cpp-build-tools/
-   - أثناء التثبيت اختر: **Desktop development with C++**.
+1. **Microsoft Edge WebView2** — Pre-installed in Windows 11 and updated Windows 10.
+2. **Rust**: Download `rustup-init.exe` from https://rustup.rs and run it.
+3. **Node.js 20+**: From https://nodejs.org (LTS version).
+4. **Visual Studio Build Tools**: From https://visualstudio.microsoft.com/visual-cpp-build-tools/
+   - During installation choose: **Desktop development with C++**.
 
 ### Linux (Ubuntu / Debian)
 ```bash
@@ -46,102 +46,102 @@ sudo apt install -y build-essential curl wget file libx11-dev libasound2-dev \
   libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 
 # Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+curl --proto '=https' --tlsv1.2 -sSf [https://sh.rustup.rs](https://sh.rustup.rs) | sh
 source "$HOME/.cargo/env"
 
-# Node.js (إذا لم يكن مثبتاً)
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+# Node.js (if not installed)
+curl -fsSL [https://deb.nodesource.com/setup_20.x](https://deb.nodesource.com/setup_20.x) | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-تحقق أن كل شيء جاهز:
+Verify everything is ready:
 ```bash
 rustc --version && node --version && npm --version
 ```
 
 ---
 
-## 2) التشغيل الأول (وضع التطوير)
+## 2) First Run (Development Mode)
 
-من داخل مجلد المشروع:
+From inside the project folder:
 
 ```bash
-npm install        # يثبت أدوات Tauri CLI (أول مرة فقط)
-npm run dev        # يبني النواة ويفتح نافذة التطبيق
+npm install        # Installs Tauri CLI tools (first time only)
+npm run dev        # Builds the core and opens the app window
 ```
 
-> أول تشغيل يستغرق عدة دقائق (ترجمة Rust)، التشغيلات التالية سريعة.
-> عند نجاح الأمر ستفتح نافذة **Flashki** ببيانات بداية جاهزة للتجربة.
+> First run takes several minutes (Rust compilation), subsequent runs are fast.
+> Upon success, the **Flashki** window will open with initial data ready for testing.
 
-### تجربة الواجهة في المتصفح فقط (بدون Rust — للاختبار السريع)
+### Testing the Frontend in Browser Only (Without Rust — For Quick Testing)
 ```bash
 npm run web
-# ثم افتح http://localhost:5173
+# Then open http://localhost:5173
 ```
-في وضع المتصفح يعمل كل شيء عدا الاتصال بـ Gemini يتم مباشرة من المتصفح بدل النواة (مفيد لتجربة الواجهة).
+In browser mode, everything works except that Gemini connection happens directly from the browser instead of the core (useful for testing the interface).
 
 ---
 
-## 3) تفعيل الذكاء الاصطناعي (Gemini)
+## 3) Enabling AI (Gemini)
 
-1. افتح https://aistudio.google.com/apikey وسجّل بحساب Google.
-2. اضغط **Create API key** وانسخ المفتاح (يبدأ بـ `AIza...`).
-3. في التطبيق: **الإعدادات ← تكامل الذكاء الاصطناعي ← مفتاح Gemini API** والصق المفتاح ثم **حفظ**.
-   - المفتاح يُحفظ **محلياً على جهازك فقط** ولا يُصدَّر مع النسخ الاحتياطية.
-4. جرب: **إضافة بطاقات ← بالذكاء الاصطناعي** → الصق أي نص دراسي → اختر عدد البطاقات → **توليد البطاقات** → راجع البطاقات المولّدة → احفظ المحدد في قسمك.
+1. Open https://aistudio.google.com/apikey and sign in with a Google account.
+2. Click **Create API key** and copy the key (starts with `AIza...`).
+3. In the app: **Settings ← AI Integration ← Gemini API Key** and paste the key then **Save**.
+   - The key is saved **locally on your device only** and is not exported with backups.
+4. Try: **Add Cards ← With AI** → Paste any study text → Choose number of cards → **Generate Cards** → Review generated cards → Save selected to your section.
 
-يمكن تغيير الموديل من ملف الإعدادات الافتراضي هو `gemini-2.5-flash`.
+The model can be changed from the settings file, default is `gemini-2.5-flash`.
 
 ---
 
-## 4) بناء نسخة التوزيع (ملفات التنصيب)
+## 4) Building the Distribution Version (Installers)
 
 ```bash
 npm run build
 ```
 
-النتائج:
-- **Windows**: `src-tauri/target/release/bundle/msi/*.msi` و `bundle/nsis/*-setup.exe`
-- **Linux**: `bundle/deb/*.deb` و `bundle/appimage/*.AppImage`
+Outputs:
+- **Windows**: `src-tauri/target/release/bundle/msi/*.msi` and `bundle/nsis/*-setup.exe`
+- **Linux**: `bundle/deb/*.deb` and `bundle/appimage/*.AppImage`
 
-هذه الملفات هي التي توزعها على المستخدمين — لا حاجة لأي سيرفر، كل مستخدم يثبت التطبيق ويعمل على جهازه محلياً.
+These files are what you distribute to users — no server needed, every user installs the app and runs it locally on their device.
 
-### تغيير أيقونة التطبيق مستقبلاً
-ضع صورة PNG مربعة 1024×1024 ثم:
+### Changing the App Icon in the Future
+Place a square 1024x1024 PNG image then:
 ```bash
 npm run icon
 ```
 
 ---
 
-## 5) خطوة أندرويد (لاحقاً عندما نجهز نسخة الحاسوب)
+## 5) Android Step (Later when desktop version is ready)
 
 ```bash
 rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
-# يتطلب تثبيت Android Studio + Android SDK ثم:
+# Requires installing Android Studio + Android SDK then:
 npm run tauri android init
 npm run tauri android dev
-npm run tauri android build   # ينتج .apk / .aab للمتجر
+npm run tauri android build   # Produces .apk / .aab for the store
 ```
 
 ---
 
-## ما المُنفَّذ حالياً (الجولة الأولى)
+## Currently Implemented (First Round)
 
-- كل شاشات التصميم الأصلي مربوطة بمنطق حقيقي: الرئيسية، الأقسام، التصفح، البحث بالتظليل، الإحصائيات الحقيقية (مخطط أعمدة + خريطة حرارية + سلاسل تعلم)، الإضافة، الإعدادات.
-- **البيانات**: IndexedDB محلية — أقسام وبطاقات وسجل مراجعات وإعدادات + بيانات بداية (4 أقسام، 20 بطاقة) لأول تشغيل.
-- **جلسة المراجعة**: بناء طابور من المستحق + الجديدة (بحد يومي)، ترتيب (خلط/تسلسل/الأصعب أولاً)، اتجاه (عادي/معكوس)، تقييم بأربع درجات يحدّث جدولة SM-2 فوراً، اختصارات لوحة المفاتيح (مسافة للقلب، 1-4 للتقييم، Esc للخروج)، شاشة نهاية جلسة بإحصاءات حقيقية.
-- **الذكاء الاصطناعي**: نص → بطاقات عبر Gemini (من نواة Rust) مع خيار الوجهين والأمثلة السياقية — **تم حذف ميزة PDF كما طلبت**.
-- **الصوت**: تسجيل ميكروفون حقيقي للوجهين وتشغيله أثناء المراجعة، ونطق TTS تلقائي أو يدوي (عربي/إنجليزي).
-- **البيانات**: تصدير/استيراد نسخة احتياطية JSON كاملة (مع التسجيلات الصوتية)، وزر مسح شامل.
+- All original design screens are connected to real logic: Home, Sections, Browse, Highlight Search, Real Statistics (Bar chart + Heatmap + Learning streaks), Add, Settings.
+- **Data**: Local IndexedDB — sections, cards, review logs, and settings + initial data (4 sections, 20 cards) for first run.
+- **Review Session**: Building a queue of due + new cards (with daily limit), sorting (shuffle/sequential/hardest first), direction (normal/reverse), 4-tier rating updating SM-2 scheduling immediately, keyboard shortcuts (Space to flip, 1-4 to rate, Esc to exit), session end screen with real statistics.
+- **AI**: Text → Cards via Gemini (from Rust core) with two-sided option and contextual examples — **PDF feature has been removed as requested**.
+- **Audio**: Real microphone recording for both sides and playback during review, and automatic or manual TTS pronunciation (Arabic/English).
+- **Data**: Full JSON backup export/import (with audio recordings), and a master reset button.
 
-## المشاكل الشائعة وحلولها
+## Common Issues and Solutions
 
-| المشكلة | الحل |
+| Issue | Solution |
 |---|---|
-| `error: Microsoft Visual C++ 14.0 or greater is required` (Windows) | ثبّت Visual Studio Build Tools مع عبء عمل "Desktop development with C++" |
-| `failed to run custom build command` أو `webkit2gtk` مفقود (Linux) | ثبّت حزم libwebkit2gtk-4.1-dev وlibgtk-3-dev من القسم أعلاه |
-| `cargo: command not found` | أعد فتح الطرفية بعد تثبيت rustup أو شغّل `source "$HOME/.cargo/env"` |
-| الخط يظهر مختلفاً في أول تشغيل بلا إنترنت | الخطوط محملة محلياً داخل المشروع — تأكد أن مجلد `src/assets/fonts` موجود |
-| فشل اتصال Gemini | تحقق من المفتاح في الإعدادات، ومن اتصال الإنترنت، وحصص الاستخدام في Google AI Studio |
-| الميكروفون لا يعمل (Windows) | تحقق من صلاحية الميكروفون لتطبيق Flashki في إعدادات الخصوصية |
+| `error: Microsoft Visual C++ 14.0 or greater is required` (Windows) | Install Visual Studio Build Tools with "Desktop development with C++" workload |
+| `failed to run custom build command` or missing `webkit2gtk` (Linux) | Install libwebkit2gtk-4.1-dev and libgtk-3-dev packages from the section above |
+| `cargo: command not found` | Reopen terminal after installing rustup or run `source "$HOME/.cargo/env"` |
+| Font appears different on first run without internet | Fonts are loaded locally inside the project — make sure `src/assets/fonts` folder exists |
+| Gemini connection failed | Check the key in settings, internet connection, and quota usage in Google AI Studio |
+| Microphone not working (Windows) | Check microphone permission for Flashki app in privacy settings |
