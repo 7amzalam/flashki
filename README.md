@@ -1,164 +1,164 @@
-# Flashki — تطبيق البطاقات الذكية والقصص التفاعلية (Tauri 2 + SQLite)
+# Flashki — Smart Flashcards & Interactive Stories (Tauri 2 + SQLite)
 
 <p align="center">
   <img src="app-icon.png" width="128" height="128" alt="Flashki Logo" />
 </p>
 
-تطبيق مكتبي متكامل مفتوح المصدر لتعلم اللغات وحفظ المفردات بتقنية **التكرار المتباعد (Spaced Repetition - SM-2)** وقراءة **القصص التفاعلية المدعومة بالذكاء الاصطناعي (Google Gemini)**، مع تخزين محلي آمن وسريع 100% عبر قاعدة بيانات **SQLite** ونطق صوتي طبيعي عالي الجودة عبر **Edge TTS**.
+A complete open-source desktop app for language learning and vocabulary memorization built on **Spaced Repetition (SM-2)**, plus **AI-powered interactive stories (Google Gemini)** — with 100% safe and fast local storage via a **SQLite** database and high-quality natural text-to-speech through **Edge TTS**.
 
 ---
 
-## 🌟 الميزات الرئيسية (Key Features)
+## 🌟 Key Features
 
-### 1. خوارزمية التكرار المتباعد الذكية (SM-2 Spaced Repetition)
-- جدولة علمية دقيقة لمراجعة الكلمات وفق استجابة الذاكرة (أزرار: *إعادة / صعب / جيد / سهل*).
-- دعم بطاقات ذات خلفية مصورة مع تعتيم سينمائي أنيق وطبقة إبراز الكلمة.
-- تسجيل صوتي خاص لكل بطاقة لممارسة النطق والاستماع.
-- دعم مستويات الإطار الأوروبي المشترك للغات (CEFR: A1, A2, B1, B2, C1, C2) لتنظيم التعلم.
+### 1. Smart Spaced Repetition Algorithm (SM-2)
+- Precise, science-based scheduling of word reviews driven by memory response (buttons: *Again / Hard / Good / Easy*).
+- Support for cards with image backgrounds, with elegant cinematic dimming and a word-highlight layer.
+- Per-card voice recording to practice pronunciation and listening.
+- Support for the Common European Framework levels (CEFR: A1, A2, B1, B2, C1, C2) to organize learning.
 
-### 2. قسم القصص التفاعلية المستقل (Interactive Stories Reader)
-- توليد قصص تفاعلية شيقة وفق أي موضوع أو مفردات يختارها المتعلم وبالمستوى المناسب.
-- **نظام القراءة ثلاثي الطبقات:**
-  1. نص القصة باللغة المستهدفة (مع محاذاة LTR كاملة تمنع تطاير علامات الترقيم).
-  2. وضع الترجمة المتوازية لكل جملة تحتها مباشرة (Interlinear Translation).
-  3. استخراج المفردات المفتاحية تلقائياً أسفل القصة.
-- **تحويل فوري لأي كلمة إلى بطاقة:** النقر على أي كلمة داخل القصة يفتح نافذة تفاعلية تتيح سماع نطقها، عرض معناها ومثالها السياقي، وحفظها فوراً كبطاقة تحت تصنيف القصة مع إرجاع الأفعال لأصلها (Infinitive) والأسماء لأدوات تعريفها (der/die/das).
-- قارئ صوتي متتابع عبر طابور جمل ذكي يدعم Google TTS و Microsoft Edge TTS.
+### 2. Standalone Interactive Stories Reader
+- Generate engaging interactive stories around any topic or vocabulary the learner picks, at the right level.
+- **Three-layer reading system:**
+  1. Story text in the target language (with full LTR alignment that prevents punctuation drift).
+  2. Parallel (interlinear) translation shown directly under each sentence.
+  3. Key vocabulary extracted automatically below the story.
+- **Turn any word into a card instantly:** clicking any word in the story opens an interactive popup to hear its pronunciation, view its meaning and contextual example, and save it immediately as a card under the story's deck — with verbs reverted to the infinitive and nouns to their definite articles (der/die/das).
+- Sequential audio reader through a smart sentence queue supporting Google TTS and Microsoft Edge TTS.
 
-### 3. توليد البطاقات الآلي بالذكاء الاصطناعي (Gemini AI)
-- تحويل أي نص أو مقال إلى بطاقات تعليمية متكاملة بضغطة زر واحدة.
-- استخراج أمثلة سياقية باللغة المستهدفة وترجمتها المباشرة إلى لغتك الأم.
-- اختيار القسم المناسب أو إنشاء قسم جديد تلقائياً بعنوان مستخرج من سياق النص.
+### 3. AI-Powered Automatic Card Generation (Gemini AI)
+- Turn any text or article into complete flashcards with a single click.
+- Extract contextual examples in the target language, translated directly into your native language.
+- Pick the right deck, or automatically create a new one titled from the text's context.
 
-### 4. إدارة شاملة للأقسام والكلمات (Deck & Word Management)
-- نافذة مخصصة لتعديل كلمات وجمل وصور كل قسم على حدة.
-- ضغط الصور آلياً باستخدام Canvas لتقليل الحجم بنسبة تفوق 90% مع الحفاظ على دقة وضوح فائقة.
-- خيار فوري لإنشاء قسم جديد مباشرة من داخل نموذج الإدخال السريع.
+### 4. Full Deck & Word Management
+- A dedicated window to edit the words, sentences and images of each deck.
+- Automatic image compression using Canvas, cutting file size by over 90% while keeping excellent clarity.
+- Instant option to create a new deck right from inside the quick-input form.
 
-### 5. دعم 8 لغات عالمية بالكامل (Multi-Language UI)
-- واجهة ثنائية الاتجاه (RTL & LTR) مترجمة بنسبة 100% إلى:
-  - 🇸🇦 العربية (Arabic)
-  - 🇺🇸 الإنجليزية (English)
-  - 🇩🇪 الألمانية (German)
-  - 🇫🇷 الفرنسية (French)
-  - 🇪🇸 الإسبانية (Spanish)
-  - 🇹🇷 التركية (Turkish)
-  - 🇮🇷 الفارسية (Persian)
-  - 🇵🇰 الأردية (Urdu)
+### 5. Full Support for 8 Global Languages (Multi-Language UI)
+- A bidirectional interface (RTL & LTR) 100% translated into:
+  - 🇸🇦 Arabic
+  - 🇺🇸 English
+  - 🇩🇪 German
+  - 🇫🇷 French
+  - 🇪🇸 Spanish
+  - 🇹🇷 Turkish
+  - 🇮🇷 Persian
+  - 🇵🇰 Urdu
 
-### 6. تخزين وأداء محلي فائق السرعة
-- قاعدة بيانات **SQLite** حقيقية (WAL mode) تضمن أمان البيانات وعدم تلفها، مدعومة بمحرك **sql.js WASM** عند المعاينة في المتصفح.
-- تصدير واستيراد النسخ الاحتياطية بصيغة JSON مع كامل التسجيلات الصوتية والصور.
-- وضع التركيز: إمكانية إخفاء الشريط الجانبي بنقرة زر واحدة للتركيز التام على القراءة والمراجعة.
+### 6. Blazing-Fast Local Storage & Performance
+- A real **SQLite** database (WAL mode) that keeps data safe and corruption-free, backed by a **sql.js WASM** engine when previewing in the browser.
+- Export and import JSON backups, including all voice recordings and images.
+- Focus mode: hide the sidebar with one click for total focus on reading and reviewing.
 
 ---
 
-## 🛠️ البنية التقنية (Architecture)
+## 🛠️ Architecture
 
-| الطبقة | التقنية المستخدمة |
+| Layer | Technology |
 |---|---|
-| **الواجهة الأمامية (Frontend)** | Vanilla JavaScript (ES6+), HTML5, Modern CSS Variables (خالي من الحزم والـ bundlers المعقدة) |
-| **محرك التخزين (Database)** | SQLite 3 عبر `tauri-plugin-sql` (ملف `flashki.db` محلي) مع fallback تلقائي لـ `sql.js WASM` |
-| **إطار التطبيق (Desktop Shell)** | Tauri 2 (Rust Core) — خفيف جداً، استهلاك رام منخفض وأمان عالٍ |
-| **محرك الذكاء الاصطناعي (AI Core)** | Google Gemini API (2.5 Flash / Flash Lite / Pro) عبر استدعاءات آمنة من قلب التطبيق |
-| **محرك النطق الصوتي (TTS)** | Microsoft Edge TTS عالي الجودة + Web Speech API المحلي + Google TTS Fallback |
-| **خوارزمية المراجعة** | SM-2 Spaced Repetition Algorithm |
+| **Frontend** | Vanilla JavaScript (ES6+), HTML5, modern CSS variables (no heavy bundlers) |
+| **Storage Engine** | SQLite 3 via `tauri-plugin-sql` (local `flashki.db` file) with automatic `sql.js WASM` fallback |
+| **Desktop Shell** | Tauri 2 (Rust core) — very lightweight, low RAM usage, high security |
+| **AI Core** | Google Gemini API (2.5 Flash / Flash Lite / Pro) via secure calls from the app core |
+| **TTS Engine** | High-quality Microsoft Edge TTS + local Web Speech API + Google TTS fallback |
+| **Review Algorithm** | SM-2 Spaced Repetition Algorithm |
 
 ---
 
-## 🚀 التثبيت والتشغيل للمطورين
+## 🚀 Installation & Running (Developers)
 
-### المتطلبات الأساسية:
-1. **Node.js**: الإصدار 20 فأعلى (LTS) من [nodejs.org](https://nodejs.org).
-2. **Rust & Cargo**: من [rustup.rs](https://rustup.rs).
-3. **أدوات النظام (Linux):**
+### Prerequisites:
+1. **Node.js**: version 20 or higher (LTS) from [nodejs.org](https://nodejs.org).
+2. **Rust & Cargo**: from [rustup.rs](https://rustup.rs).
+3. **System tools (Linux):**
    ```bash
    sudo apt update
    sudo apt install -y build-essential curl wget file libx11-dev libasound2-dev \
      libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
    ```
 
-### 1. تشغيل التطبيق في وضع التطوير (Desktop Development):
+### 1. Run the app in desktop development mode:
 ```bash
-# تثبيت التبعيات
+# Install dependencies
 npm install
 
-# تشغيل التطبيق عبر Tauri ونافذة سطح المكتب
+# Run the app through Tauri in a desktop window
 npm run dev
 ```
 
-### 2. تشغيل واجهة الويب السريعة في المتصفح:
+### 2. Run the quick web preview in a browser:
 ```bash
 npm run web
-# افتح المتصفح على: http://localhost:5173
+# Open your browser at: http://localhost:5173
 ```
 
-### 3. بناء النسخة الإنتاجية القابلة للتوزيع (Production Build):
+### 3. Build the distributable production version:
 ```bash
 npm run build
 ```
-تُنتج الحزم التثبيتية جاهزة للتوزيع في المسارات:
-- **Windows:** `src-tauri/target/release/bundle/nsis/*.exe` أو `.msi`
-- **Linux:** `src-tauri/target/release/bundle/deb/*.deb` أو `.AppImage`
+This produces ready-to-distribute installer packages at:
+- **Windows:** `src-tauri/target/release/bundle/nsis/*.exe` or `.msi`
+- **Linux:** `src-tauri/target/release/bundle/deb/*.deb` or `.AppImage`
 - **macOS:** `src-tauri/target/release/bundle/dmg/*.dmg`
 
 ---
 
-## 🔑 تفعيل الذكاء الاصطناعي (Gemini)
+## 🔑 Enabling AI (Gemini)
 
-1. احصل على مفتاح مجاني من [Google AI Studio](https://aistudio.google.com/apikey).
-2. افتح التطبيق وانتقل إلى: **الإعدادات ← محرك الذكاء الاصطناعي**.
-3. الصق المفتاح واضغط **حفظ واختبار الاتصال**.
-4. يتم تشفير المفتاح وتخزينه **محلياً فقط على جهازك** دون مشاركته مع أي خادم خارجي.
+1. Get a free key from [Google AI Studio](https://aistudio.google.com/apikey).
+2. Open the app and go to: **Settings → AI Engine**.
+3. Paste the key and press **Save & Test Connection**.
+4. The key is encrypted and stored **locally on your device only**, never shared with any external server.
 
 ---
 
-## 📁 هيكل المشروع
+## 📁 Project Structure
 
 ```text
 flashki-main/
-├── src/                      # الواجهة الأمامية (HTML / CSS / JavaScript)
-│   ├── index.html            # بنية الشاشات والقوالب
+├── src/                      # Frontend (HTML / CSS / JavaScript)
+│   ├── index.html            # Screen structure and templates
 │   ├── css/
-│   │   └── styles.css        # التنسيقات ونظام السمات الداكن والفاتح وتنسيق RTL/LTR
+│   │   └── styles.css        # Styles, dark/light theme system, and RTL/LTR layout
 │   ├── js/
-│   │   ├── app.js            # إدارة دورة حياة التطبيق وجلسات المراجعة
-│   │   ├── db.js             # طبقة قاعدة بيانات SQLite الموحدة
-│   │   ├── store.js          # واجهة إدارة الكروت والأقسام والمراجعات
-│   │   ├── srs.js            # خوارزمية SM-2 لجدولة التكرار المتباعد
-│   │   ├── ai.js             # معالجة النصوص وتوليد البطاقات والقصص مع Gemini
-│   │   ├── tts.js            # محركات تحويل النص إلى كلام (Edge TTS / Google)
-│   │   ├── audio.js          # مسجل الصوت ومعالجة الميكروفون
-│   │   ├── render.js         # محرك الرسم وتحديث واجهة المستخدم
-│   │   ├── handlers.js       # معالجة الأحداث والمدخلات وضغط الصور
-│   │   ├── i18n.js           # نظام التدويل والترجمة التلقائية
-│   │   └── util.js           # دوال مساعدة، ضغط Canvas، وحساب المستويات
-│   └── i18n/                 # ملفات الترجمة الثمانية (405 مفتاح ترجمة لكل لغة)
+│   │   ├── app.js            # App lifecycle and review-session management
+│   │   ├── db.js             # Unified SQLite database layer
+│   │   ├── store.js          # Interface for cards, decks and reviews
+│   │   ├── srs.js            # SM-2 spaced repetition scheduling algorithm
+│   │   ├── ai.js             # Text processing, card & story generation with Gemini
+│   │   ├── tts.js            # Text-to-speech engines (Edge TTS / Google)
+│   │   ├── audio.js          # Voice recorder and microphone handling
+│   │   ├── render.js         # Rendering engine and UI updates
+│   │   ├── handlers.js       # Event and input handling, image compression
+│   │   ├── i18n.js           # Internationalization and auto-translation system
+│   │   └── util.js           # Helpers, Canvas compression, and level calculation
+│   └── i18n/                 # The eight translation files (405 keys per language)
 │       ├── ar.json / en.json / de.json / fr.json
 │       └── es.json / tr.json / fa.json / ur.json
-├── src-tauri/                # نواة تطبيق سطح المكتب (Rust + Tauri 2)
+├── src-tauri/                # Desktop app core (Rust + Tauri 2)
 │   ├── src/
-│   │   ├── main.rs           # نقطة الانطلاق
-│   │   └── lib.rs            # دوال Rust: حفظ الصور، الاتصال بـ Gemini، و Edge TTS
-│   ├── Cargo.toml            # حزم وتكوينات Rust
-│   └── tauri.conf.json       # إعدادات النوافذ والحزم والأذونات
+│   │   ├── main.rs           # Entry point
+│   │   └── lib.rs            # Rust functions: image saving, Gemini calls, and Edge TTS
+│   ├── Cargo.toml            # Rust packages and configuration
+│   └── tauri.conf.json       # Window, packaging and permissions settings
 └── package.json
 ```
 
 ---
 
-## 🗺️ خارطة الطريق (Roadmap)
+## 🗺️ Roadmap
 
-| المنصة | الحالة | ملاحظات |
+| Platform | Status | Notes |
 |---|---|---|
-| 🪟 Windows | ✅ متوفر (msi / nsis) | عبر صفحة الإصدارات في GitHub |
-| 🐧 Linux | ✅ متوفر (deb / rpm / AppImage) | عبر صفحة الإصدارات في GitHub |
-| 🤖 Android | 🔜 **قريباً بإذن الله** | Tauri 2 يدعم أندرويد رسمياً — النسخة قيد التحضير كتحديث مستقبلي |
-| 🍎 iOS / macOS | ⏳ غير مجدول حالياً | يتطلب بناءً حصرياً على جهاز Mac |
+| 🪟 Windows | ✅ Available (msi / nsis) | Via the GitHub Releases page |
+| 🐧 Linux | ✅ Available (deb / rpm / AppImage) | Via the GitHub Releases page |
+| 🤖 Android | 🔜 **Coming soon, in shaa Allah** | Tauri 2 officially supports Android — the port is in preparation as a future update |
+| 🍎 iOS / macOS | ⏳ Not scheduled for now | Requires building exclusively on a Mac |
 
 ---
 
-## 📄 الترخيص (License)
+## 📄 License
 
-هذا المشروع مرخص بموجب رخصة [MIT License](LICENSE).
-جميع الحقوق محفوظة للمطورين ومجتمع المصادر المفتوحة.
+This project is licensed under the [MIT License](LICENSE).
+All rights reserved to the developers and the open-source community.
