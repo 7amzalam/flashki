@@ -10,7 +10,19 @@
   function showModal(id) { getEl(id).classList.add('show'); }
   function closeModal(el) {
     if (typeof el === 'string') el = getEl(el);
-    if (el && el.classList) el.classList.remove('show');
+    if (el && el.classList) {
+      el.classList.remove('show');
+      if (el.id === 'storyResultModal') {
+        if (App.tts && App.tts.cancel) App.tts.cancel();
+        if (typeof hideStoryWordPopover === 'function') hideStoryWordPopover();
+      }
+      if (el.id === 'createDeckModal') {
+        var ds = getEl('deckSelect');
+        if (ds && ds.value === '__new__') {
+          ds.value = App.state.decks.length ? App.state.decks[0].id : '';
+        }
+      }
+    }
   }
 
   /* ---------- deck editing (v1.1) ---------- */
@@ -69,7 +81,7 @@
      كانت البطاقات تُدفع للذاكرة بلا deckId وتفشل كتابة SQLite بصمت
      (NOT NULL cards.deck_id) → تظهر بالواجهة ثم تختفي بعد إعادة التشغيل ── */
   function ensureDeck(preferredId) {
-    if (preferredId) return Promise.resolve(preferredId);
+    if (preferredId && preferredId !== '__new__') return Promise.resolve(preferredId);
     if (App.state.decks && App.state.decks.length) return Promise.resolve(App.state.decks[0].id);
     var deck = { id: U.uid(), name: suggestedDeckName(), desc: '', icon: '📚', color: App.store.DECK_COLORS[0], createdAt: Date.now() };
     return App.store.saveDeck(deck).then(function () {
@@ -102,6 +114,8 @@
       closeModal('createDeckModal');
       U.toast(App.t('deckCreated'), 'success');
       App.render.renderAll();
+      var ds = getEl('deckSelect');
+      if (ds) ds.value = deck.id;
     });
   }
 
@@ -150,10 +164,11 @@
   function isTauri() { return !!(window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke); }
 
   function showImagePreview(src) {
-    var prev = getEl('cardImagePreview'), img = getEl('cardImageImg'), up = getEl('imageUploadBtn');
+    var prev = getEl('cardImagePreview'), img = getEl('cardImageImg'), zone = getEl('cardUploadZone'), up = getEl('imageUploadBtn');
     if (!prev || !img) return;
     img.src = src;
-    prev.style.display = '';
+    prev.style.display = 'inline-flex';
+    if (zone) zone.style.display = 'none';
     if (up) up.style.display = 'none';
   }
 
@@ -161,24 +176,23 @@
     pendingImage = null; imageRemoved = false;
     var prev = getEl('cardImagePreview'); if (prev) prev.style.display = 'none';
     var img = getEl('cardImageImg'); if (img) img.src = '';
+    var zone = getEl('cardUploadZone'); if (zone) zone.style.display = '';
     var up = getEl('imageUploadBtn'); if (up) up.style.display = '';
     var inp = getEl('imageFileInput'); if (inp) inp.value = '';
   }
 
   function pickCardImage(file) {
     if (!file) return;
-    if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) { U.toast(App.t('imageBadType'), 'error'); return; }
-    if (file.size > 8 * 1024 * 1024) { U.toast(App.t('imageTooBig'), 'error'); return; }
-    var reader = new FileReader();
-    reader.onload = function () {
-      var dataUrl = String(reader.result || '');
-      var ext = file.type === 'image/png' ? 'png' : (file.type === 'image/webp' ? 'webp' : 'jpg');
-      pendingImage = { dataUrl: dataUrl, b64: dataUrl.split(',')[1] || '', ext: ext };
+    if (!/^image\/(png|jpe?g|webp|gif|bmp)$/i.test(file.type)) { U.toast(App.t('imageBadType'), 'error'); return; }
+    U.compressImage(file, 1080, 0.82).then(function (res) {
+      pendingImage = res;
       imageRemoved = false;
-      showImagePreview(dataUrl);
-      U.toast(App.t('imagePreviewReady'), 'success');
-    };
-    reader.readAsDataURL(file);
+      showImagePreview(res.dataUrl);
+      var kb = Math.round((res.approxBytes || 0) / 1024);
+      U.toast('✓ تم ضغط الصورة وتجهيزها (' + kb + ' KB)', 'success');
+    }).catch(function (err) {
+      U.toast('تعذر معالجة الصورة: ' + (err && err.message ? err.message : ''), 'error');
+    });
   }
 
   /* يعيد {path} عند الحفظ، {cleared} عند الإزالة، null عند لا تغيير */
@@ -242,14 +256,27 @@
   function saveManualCard() {
     var front = getEl('frontInput').value.trim();
     var back = getEl('backInput').value.trim();
+    var example = (getEl('exampleInput') ? getEl('exampleInput').value.trim() : '');
+    var exampleTranslation = (getEl('exampleTranslationInput') ? getEl('exampleTranslationInput').value.trim() : '');
     if (!front || !back) { U.toast(App.t('needFrontBack'), 'error'); return; }
-    var deckId = getEl('deckSelect').value || (App.state.decks[0] && App.state.decks[0].id);
+
+    var ds = getEl('deckSelect');
+    var rawDeckVal = ds ? ds.value : '';
+    if (rawDeckVal === '__new__') {
+      openCreateDeck();
+      U.toast('يرجى إنشاء القسم أولاً أو اختياره من القائمة', 'info');
+      return;
+    }
+    var deckId = rawDeckVal || (App.state.decks[0] && App.state.decks[0].id);
     var tags = parseTags(getEl('tagsInput').value);
-    var langSel = getEl('cardLangSelect');
-    var cefrSel = getEl('cardCefrSelect');
-    var cardLang = (langSel && langSel.value !== 'auto') ? langSel.value : null;
-    var cardCefr = (cefrSel && cefrSel.value !== 'auto') ? cefrSel.value : null;
+    var cardLang = (App.state.profile && App.state.profile.targetLang) || 'de';
+    var cardCefr = (App.state.profile && App.state.profile.cefrLevel) || 'B1';
     var now = Date.now();
+
+    var recF = document.querySelector('.voice-recorder[data-recorder="front"]');
+    var getAudioFront = (recF && recF._blob)
+      ? (typeof recF._blob === 'string' ? Promise.resolve(recF._blob) : U.blobToDataURL(recF._blob))
+      : Promise.resolve(null);
 
     /* ── وضع التعديل: نفس النموذج + قاعدة تصفير SM-2 ── */
     if (App.state.editingCardId) {
@@ -258,52 +285,69 @@
       if (!c) { exitEditMode(); return; }
       var contentChanged = (c.front !== front) || (c.back !== back);
       ensureDeck(deckId).then(function (resolvedDeckId) {
-        c.front = front; c.back = back; c.tags = tags; c.deckId = resolvedDeckId;
-        c.lang = cardLang; c.cefr = cardCefr;
-        c.updatedAt = now;
-        if (contentChanged) c.srs = App.srs.newState(now); /* تعديل front/back = تصفير؛ الوسوم/الصوت فقط = لا تصفير */
-        if (imageRemoved) c.imagePath = null; /* أزال المستخدم الصورة */
-        return persistCardImage(c.id).then(function (res) {
-          if (res && res.path) c.imagePath = res.path;
-          return App.store.saveCard(c);
-        }).then(function () {
-          U.toast(contentChanged ? App.t('srsReset') : App.t('savedOk'), 'success');
-          exitEditMode();
-          App.render.renderAll();
-        }, function (err) {
-          U.toast(App.t('saveFailed') + (err && err.message ? ' — ' + err.message : ''), 'error');
+        return getAudioFront.then(function (audioDataUrl) {
+          c.front = front; c.back = back; c.tags = tags; c.deckId = resolvedDeckId;
+          c.example = example; c.exampleTranslation = exampleTranslation;
+          c.lang = cardLang; c.cefr = cardCefr;
+          c.updatedAt = now;
+          if (contentChanged) c.srs = App.srs.newState(now); /* تعديل front/back = تصفير؛ الوسوم/الصوت فقط = لا تصفير */
+          if (imageRemoved) c.imagePath = null; /* أزال المستخدم الصورة */
+          if (recF && recF._blob) {
+            c.audioFront = audioDataUrl;
+          } else if (recF && !recF._blob && recF.classList.contains('del-clicked')) {
+            c.audioFront = null;
+          }
+          return persistCardImage(c.id).then(function (res) {
+            if (res && res.path) c.imagePath = res.path;
+            return App.store.saveCard(c);
+          }).then(function () {
+            U.toast(contentChanged ? App.t('srsReset') : App.t('savedOk'), 'success');
+            exitEditMode();
+            App.render.renderAll();
+          }, function (err) {
+            U.toast(App.t('saveFailed') + (err && err.message ? ' — ' + err.message : ''), 'error');
+          });
         });
       });
       return;
     }
 
-    var recF = document.querySelector('.voice-recorder[data-recorder="front"]');
-    var recB = document.querySelector('.voice-recorder[data-recorder="back"]');
     ensureDeck(deckId).then(function (resolvedDeckId) {
-      var card = { id: U.uid(), deckId: resolvedDeckId, front: front, back: back, tags: tags, lang: cardLang, cefr: cardCefr, srs: App.srs.newState(now), createdAt: now, updatedAt: now, audioFront: recF && recF._blob, audioBack: recB && recB._blob };
-      var ops = [persistCardImage(card.id).then(function (res) {
-        if (res && res.path) card.imagePath = res.path;
-        return App.store.saveCard(card);
-      })];
-      App.state.cards.push(card);
-      if (getEl('twoSidedCheck').checked) {
-        var c2 = { id: U.uid(), deckId: resolvedDeckId, front: back, back: front, tags: tags.concat(['↔']), lang: cardLang, cefr: cardCefr, srs: App.srs.newState(now), createdAt: now + 1, updatedAt: now, audioFront: recB && recB._blob, audioBack: recF && recF._blob };
-        ops.push(App.store.saveCard(c2));
-        App.state.cards.push(c2);
-      }
-      return Promise.all(ops).then(function () {
-        U.toast(App.t('savedOk'), 'success');
-        getEl('frontInput').value = ''; getEl('backInput').value = ''; getEl('tagsInput').value = '';
-        if (langSel) langSel.value = 'auto'; if (cefrSel) cefrSel.value = 'auto';
-        if (recF) App.audio.clear(recF);
-        if (recB) App.audio.clear(recB);
-        resetImageUI();
-        updatePreview();
-        App.render.renderAll();
-      }, function (err) {
-        App.state.cards = App.state.cards.filter(function (x) { return x.id !== card.id && (!c2 || x.id !== c2.id); });
-        App.render.renderAll();
-        U.toast(App.t('saveFailed') + (err && err.message ? ' — ' + err.message : ''), 'error');
+      return getAudioFront.then(function (audioDataUrl) {
+        var card = {
+          id: U.uid(),
+          deckId: resolvedDeckId,
+          front: front,
+          back: back,
+          example: example,
+          exampleTranslation: exampleTranslation,
+          tags: tags,
+          lang: cardLang,
+          cefr: cardCefr,
+          srs: App.srs.newState(now),
+          createdAt: now,
+          updatedAt: now,
+          audioFront: audioDataUrl || null,
+          audioBack: null
+        };
+        return persistCardImage(card.id).then(function (res) {
+          if (res && res.path) card.imagePath = res.path;
+          App.state.cards.push(card);
+          return App.store.saveCard(card);
+        }).then(function () {
+          U.toast(App.t('savedOk'), 'success');
+          getEl('frontInput').value = ''; getEl('backInput').value = ''; getEl('tagsInput').value = '';
+          if (getEl('exampleInput')) getEl('exampleInput').value = '';
+          if (getEl('exampleTranslationInput')) getEl('exampleTranslationInput').value = '';
+          if (recF) App.audio.clear(recF);
+          resetImageUI();
+          updatePreview();
+          App.render.renderAll();
+        }, function (err) {
+          App.state.cards = App.state.cards.filter(function (x) { return x.id !== card.id; });
+          App.render.renderAll();
+          U.toast(App.t('saveFailed') + (err && err.message ? ' — ' + err.message : ''), 'error');
+        });
       });
     });
   }
@@ -327,6 +371,8 @@
     if (manualTab && !manualTab.classList.contains('active')) manualTab.click();
     getEl('frontInput').value = card.front;
     getEl('backInput').value = card.back;
+    if (getEl('exampleInput')) getEl('exampleInput').value = card.example || '';
+    if (getEl('exampleTranslationInput')) getEl('exampleTranslationInput').value = card.exampleTranslation || '';
     getEl('tagsInput').value = (card.tags || []).join('، ');
     getEl('deckSelect').value = card.deckId;
     var langSel = getEl('cardLangSelect');
@@ -353,6 +399,8 @@
   function exitEditMode() {
     App.state.editingCardId = null;
     getEl('frontInput').value = ''; getEl('backInput').value = ''; getEl('tagsInput').value = '';
+    if (getEl('exampleInput')) getEl('exampleInput').value = '';
+    if (getEl('exampleTranslationInput')) getEl('exampleTranslationInput').value = '';
     getEl('twoSidedRow').style.display = '';
     getEl('cancelEditCardBtn').style.display = 'none';
     var lbl = getEl('saveCardBtn').querySelector('span');
@@ -408,9 +456,16 @@
     if (!text) { U.toast(App.t('aiNeedText'), 'error'); return; }
     if (!App.state.settings.apiKey) { U.toast(App.t('aiNoKey'), 'error'); switchView('settings'); return; }
     if (text.length > 10000) text = text.slice(0, 10000);
-    /* عدد البطاقات: 5 / 10 / تلقائي (كل 200 حرف = بطاقة، حد أدنى 3 وحد أقصى 20) */
+    /* عدد البطاقات: 5 / 10 / تلقائي (استخراج غني من النص بالكامل) */
     var count = App.state.aiOptions.count;
-    if (count === 'auto') count = Math.min(20, Math.max(3, Math.ceil(text.length / 200)));
+    if (count === 'auto') {
+      var words = (text.match(/[\p{L}\p{N}]+/gu) || []).length;
+      if (words < 25) count = Math.min(words, 6);
+      else if (words < 60) count = 10;
+      else if (words < 120) count = 14;
+      else if (words < 250) count = 18;
+      else count = Math.min(25, Math.max(16, Math.ceil(words / 12)));
+    }
     var opts = Object.assign({}, App.state.aiOptions, { count: count });
     var btn = getEl('generateBtn');
     btn.disabled = true;
@@ -463,17 +518,384 @@
     });
   }
 
+  var storyFontSizePct = 100;
+  var isStoryPlaying = false;
+  var currentSelectedWord = '';
+  var currentSelectedSentence = '';
+  var currentWordElement = null;
+
+  function formatStoryWithWords(storyText) {
+    if (!storyText) return '';
+    var paragraphs = String(storyText).split(/\n+/);
+    var p = App.state.profile;
+    var isTargetRtl = (p && (p.targetLang === 'ar' || p.targetLang === 'ur' || p.targetLang === 'fa'));
+    var dir = isTargetRtl ? 'rtl' : 'ltr';
+    return paragraphs.map(function (item) {
+      var clean = item.trim();
+      if (!clean) return '';
+      var html = clean.replace(/([\p{L}\p{N}_-]+)/gu, function (match) {
+        return '<span class="story-word" data-word="' + U.esc(match) + '">' + U.esc(match) + '</span>';
+      });
+      return '<p class="story-para" dir="' + dir + '">' + html + '</p>';
+    }).join('');
+  }
+
+  function applyStoryFontSize() {
+    var sz = (19 * storyFontSizePct / 100);
+    var targetEl = getEl('storiesViewText');
+    if (targetEl) {
+      targetEl.style.setProperty('--story-font-size', sz + 'px');
+      targetEl.style.fontSize = sz + 'px';
+      targetEl.style.lineHeight = (2.0 * Math.max(0.9, storyFontSizePct / 100));
+    }
+    var trEl = getEl('storiesViewTranslation');
+    if (trEl) {
+      trEl.style.fontSize = (sz * 0.88) + 'px';
+    }
+    var modalText = getEl('storyText');
+    if (modalText) {
+      modalText.style.fontSize = sz + 'px';
+      modalText.style.lineHeight = (2.0 * Math.max(0.9, storyFontSizePct / 100));
+    }
+    document.querySelectorAll('.story-sentence-target').forEach(function (el) {
+      el.style.fontSize = sz + 'px';
+    });
+    document.querySelectorAll('.story-sentence-native').forEach(function (el) {
+      el.style.fontSize = (sz * 0.84) + 'px';
+    });
+
+    var valEl = getEl('storyFontVal');
+    if (valEl) valEl.textContent = storyFontSizePct + '%';
+    var valEl2 = getEl('storiesFontPercent');
+    if (valEl2) valEl2.textContent = storyFontSizePct + '%';
+  }
+
+  function changeStoryFontSize(delta) {
+    storyFontSizePct = Math.min(160, Math.max(80, storyFontSizePct + delta));
+    applyStoryFontSize();
+  }
+
+  function updateStoryTtsBtnState(state) {
+    var btns = [getEl('storyTtsBtn'), getEl('storiesTtsBtn')];
+    var labels = [getEl('storyTtsBtnText'), getEl('storiesTtsBtnText')];
+    btns.forEach(function (btn) {
+      if (!btn) return;
+      btn.classList.remove('loading', 'speaking');
+      if (state === 'loading') btn.classList.add('loading');
+      else if (state === 'speaking') btn.classList.add('speaking');
+    });
+    if (state === 'loading') {
+      labels.forEach(function (l) { if (l) l.textContent = App.t('ttsLoading') || 'جاري التحميل...'; });
+    } else if (state === 'speaking') {
+      labels.forEach(function (l) { if (l) l.textContent = App.t('ttsStop') || 'إيقاف'; });
+    } else {
+      isStoryPlaying = false;
+      labels.forEach(function (l) { if (l) l.textContent = App.t('listen') || 'استمع'; });
+    }
+  }
+
+  function stopStoryAudio() {
+    storySession++; /* يُبطل أي أحداث صوت قديمة قيد الطريق */
+    isStoryPlaying = false;
+    if (App.tts && App.tts.cancel) App.tts.cancel();
+    updateStoryTtsBtnState('idle');
+  }
+
+  /* كاش صوت القصة الحالية: إعادة الاستماع فورية من الذاكرة بلا طلب Edge TTS جديد */
+  var storyAudioCache = { text: '', blob: null };
+  var storySession = 0;
+
+  function toggleStoryAudio() {
+    var st = App.state.lastStory;
+    if (!st || !st.story) return;
+
+    var fullText = String(st.story).trim();
+    if (!fullText) return;
+
+    /* التبديل يعتمد على حالة القصة فقط — isSpeaking العام قد يعلق true في
+       WebKitGTK (speechSynthesis.speaking) وكان يحجب إعادة الاستماع نهائياً.
+       speak()/playAudioBlob() توقف أي صوت آخر تلقائياً قبل البدء */
+    if (isStoryPlaying) { stopStoryAudio(); return; }
+
+    storySession++;
+    var mySession = storySession;
+    isStoryPlaying = true;
+    updateStoryTtsBtnState('loading');
+
+    function onEv(ev) {
+      if (mySession !== storySession) return; /* حدث من جلسة أُوقفت — تجاهل */
+      if (ev === 'play') {
+        updateStoryTtsBtnState('speaking');
+      } else if (ev === 'end' || ev === 'error') {
+        stopStoryAudio();
+      }
+    }
+
+    /* إعادة استماع: نفس القصة نصياً → شغّل النسخة المخبأة مباشرة */
+    if (storyAudioCache.blob && storyAudioCache.text === fullText) {
+      App.tts.playAudioBlob(storyAudioCache.blob, onEv);
+      return;
+    }
+
+    App.tts.speak(fullText, 'front', onEv, function (blob) {
+      if (blob && mySession === storySession) storyAudioCache = { text: fullText, blob: blob };
+    });
+  }
+
+  function findBestSentencePair(vocabWord, pairs) {
+    if (!pairs || !pairs.length || !vocabWord) return null;
+
+    var clean = vocabWord.replace(/^(die|der|das|den|dem|des|ein|eine|einen|einem|einer|the|a|an|le|la|les|un|une|el|los|las)\s+/i, '').trim();
+    var stems = new Set([clean]);
+    var tokens = clean.split(/[\s\-_/]+/);
+    tokens.forEach(function (tok) {
+      if (!tok) return;
+      stems.add(tok);
+      if (tok.length >= 4) {
+        stems.add(tok.slice(0, -1));
+        stems.add(tok.slice(0, -2));
+        stems.add(tok.slice(0, -3));
+        var m = tok.match(/^(aus|auf|ab|an|bei|ein|mit|vor|zu|ent|ver|zer|be)(.+)$/i);
+        if (m && m[2].length >= 3) {
+          var root = m[2];
+          stems.add(root);
+          stems.add(root.slice(0, -1));
+          stems.add(root.slice(0, -2));
+          stems.add(m[1] + 'ge' + root.slice(0, -2));
+        }
+      }
+    });
+
+    var stemList = Array.from(stems).filter(function (s) { return s.length >= 3; });
+    stemList.sort(function (a, b) { return b.length - a.length; });
+
+    for (var j = 0; j < stemList.length; j++) {
+      var stm = stemList[j].toLowerCase();
+      for (var i = 0; i < pairs.length; i++) {
+        var p = pairs[i];
+        if (p && p.target && p.target.toLowerCase().indexOf(stm) >= 0) {
+          return p;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function findSentenceForWord(storyText, word) {
+    if (!storyText || !word) return '';
+    var sentences = storyText.split(/(?<=[.!?])\s+/);
+    for (var i = 0; i < sentences.length; i++) {
+      if (sentences[i].indexOf(word) >= 0) return sentences[i].trim();
+    }
+    return '';
+  }
+
+  function hideStoryWordPopover() {
+    var pop = getEl('storyWordPopover');
+    if (pop) pop.style.display = 'none';
+    currentWordElement = null;
+  }
+
+  function openStoryWordPopover(wordEl) {
+    var word = (wordEl.getAttribute('data-word') || wordEl.textContent || '').trim();
+    if (!word || word.length < 2) return;
+    currentSelectedWord = word;
+    currentWordElement = wordEl;
+    var st = App.state.lastStory;
+    currentSelectedSentence = st ? findSentenceForWord(st.story, word) : '';
+
+    var pop = getEl('storyWordPopover');
+    if (!pop) return;
+
+    var exists = App.state.cards.some(function (c) {
+      return (c.front || '').toLowerCase().indexOf(word.toLowerCase()) >= 0;
+    });
+
+    var knownMeaning = '';
+    if (st && st.vocabulary) {
+      var match = st.vocabulary.filter(function (v) {
+        var vw = (v.word || '').toLowerCase();
+        var w = word.toLowerCase();
+        return vw === w || w.indexOf(vw) >= 0 || vw.indexOf(w) >= 0;
+      })[0];
+      if (match) knownMeaning = match.meaning;
+    }
+
+    pop.innerHTML =
+      '<div class="story-pop-head">' +
+        '<span class="story-pop-word">' + U.esc(word) + '</span>' +
+        '<button type="button" class="story-pop-close" id="closeStoryPopBtn">×</button>' +
+      '</div>' +
+      '<div id="storyPopBody">' +
+        (knownMeaning
+          ? '<div class="story-pop-meaning">💡 <b>' + (App.t('translationLbl') || 'الترجمة') + ':</b> ' + U.esc(knownMeaning) + '</div>'
+          : '<div id="storyPopAiTranslate" class="story-pop-loading"><span class="spin"></span> <span>' + (App.t('extractingTranslation') || 'جاري استخراج الترجمة...') + '</span></div>') +
+        (exists ? '<div class="story-pop-success">✓ ' + (App.t('cardAlreadyExists') || 'موجودة مسبقاً في بطاقاتك') + '</div>' : '') +
+        '<button type="button" class="story-pop-btn" id="createWordCardBtn">' +
+          '<svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>' +
+          '<span>' + (App.t('convertWordToCardBtn') || 'تحويل إلى بطاقة بالذكاء الاصطناعي') + '</span>' +
+        '</button>' +
+      '</div>';
+
+    pop.style.display = 'block';
+
+    var rect = wordEl.getBoundingClientRect();
+    var popWidth = 280;
+    var popHeight = 170;
+
+    var top = rect.bottom + 8;
+    var left = rect.left;
+
+    if (left + popWidth > window.innerWidth - 16) {
+      left = Math.max(16, window.innerWidth - popWidth - 16);
+    }
+    if (left < 16) left = 16;
+
+    if (top + popHeight > window.innerHeight - 16) {
+      top = Math.max(16, rect.top - popHeight - 8);
+    }
+
+    pop.style.top = top + 'px';
+    pop.style.left = left + 'px';
+
+    if (!knownMeaning && App.ai && App.ai.translate && App.state.settings.apiKey) {
+      var askedWord = word; /* لعزل السباق: ترجمة كلمة قديمة لا تغلب الكلمة المعروضة حالياً */
+      App.ai.translate(word).then(function (trans) {
+        if (askedWord !== currentSelectedWord || !trans) return;
+        var el = getEl('storyPopAiTranslate');
+        if (el) {
+          el.outerHTML = '<div class="story-pop-meaning">💡 <b>' + (App.t('translationLbl') || 'الترجمة') + ':</b> ' + U.esc(trans) + '</div>';
+        }
+      }).catch(function () {
+        if (askedWord !== currentSelectedWord) return;
+        var el2 = getEl('storyPopAiTranslate');
+        if (el2) {
+          el2.outerHTML = '<div class="story-pop-meaning" style="color:#f59e0b;">⚠ ' +
+            (App.t('popTranslateFailed') || 'تعذر الحصول على الترجمة — أعد النقر على الكلمة') + '</div>';
+        }
+      });
+    }
+  }
+
+  /* بعد تحويل كلمة إلى بطاقة: علّم كل مواضعها في نص القصة (العرض يعيد بناءه renderAll) */
+  function markStoryWordSaved(word) {
+    if (!word || word.length < 2) return;
+    var w = word.toLowerCase();
+    document.querySelectorAll('.story-word').forEach(function (el) {
+      if ((el.getAttribute('data-word') || '').toLowerCase() === w) el.classList.add('saved-card');
+    });
+  }
+
+  function ensureStoryDeck(storyTitle) {
+    var title = (storyTitle || '').trim() || (App.t('storiesTitle') || 'قصة تفاعلية');
+    var existing = App.state.decks.filter(function (d) {
+      return (d.name || '').trim().toLowerCase() === title.toLowerCase();
+    })[0];
+    if (existing) return Promise.resolve(existing.id);
+
+    var newDeck = {
+      id: U.uid(),
+      name: title,
+      desc: title,
+      icon: '📖',
+      color: '#8b5cf6',
+      createdAt: Date.now()
+    };
+    App.state.decks.push(newDeck);
+    return App.store.saveDeck(newDeck).then(function () {
+      App.render.renderDecks();
+      return newDeck.id;
+    });
+  }
+
+  function convertWordToCard() {
+    var word = currentSelectedWord;
+    var sentence = currentSelectedSentence;
+    var body = getEl('storyPopBody');
+    if (!body || !word) return;
+
+    body.innerHTML = '<div class="story-pop-loading"><span class="spin"></span> <span>' + (App.t('creatingAndTranslating') || 'جاري الإنشاء والترجمة...') + '</span></div>';
+
+    var st = App.state.lastStory;
+    var storyTitle = (st && st.title) ? st.title.trim() : (App.t('storiesTitle') || 'قصة تفاعلية');
+
+    var pairs = (st && st.sentences && st.sentences.length) ? st.sentences : (App.render && App.render.pairStorySentences && st ? App.render.pairStorySentences(st) : []);
+    var matchPair = findBestSentencePair(word, pairs);
+    var fallbackSentence = matchPair ? matchPair.target : sentence;
+    var fallbackTrans = matchPair ? matchPair.native : '';
+
+    App.ai.createCardFromWord(word, sentence).then(function (res) {
+      var now = Date.now();
+      return ensureStoryDeck(storyTitle).then(function (resolvedDeckId) {
+        var card = {
+          id: U.uid(),
+          deckId: resolvedDeckId,
+          front: res.front || word,
+          back: res.back || '',
+          example: res.example || fallbackSentence || sentence || '',
+          exampleTranslation: res.exampleTranslation || fallbackTrans || '',
+          tags: ['story', storyTitle],
+          cefr: res.cefr || (App.state.profile && App.state.profile.cefrLevel) || 'B1',
+          srs: App.srs.newState(now),
+          createdAt: now,
+          updatedAt: now
+        };
+
+        App.state.cards.push(card);
+        return App.store.saveCard(card).then(function () {
+          if (currentWordElement) currentWordElement.classList.add('saved-card');
+          body.innerHTML =
+            '<div class="story-pop-success">✓ ' + (App.t('cardAddedOk') || 'تمت إضافة البطاقة بنجاح!') + '</div>' +
+            '<div class="story-pop-res">' +
+              '<div><b>' + U.esc(card.front) + '</b></div>' +
+              '<div class="story-pop-res-back">' + U.esc(card.back) + '</div>' +
+              '<div style="font-size:11.5px;color:var(--text-3);margin-top:4px;">' + (App.t('inDeck') || 'في قسم:') + ' <b>' + U.esc(storyTitle) + '</b></div>' +
+            '</div>';
+          U.toast((App.t('cardAddedOk') || 'تمت إضافة البطاقة بنجاح!') + ': ' + card.front + ' ' + (App.t('inDeck') || 'في قسم:') + ' "' + storyTitle + '"', 'success');
+          App.render.renderAll();
+          /* renderAll يعيد بناء نص القصة — أعد تعليم الكلمة كمحفوظة */
+          markStoryWordSaved(card.front);
+          markStoryWordSaved(word);
+        });
+      });
+    }).catch(function (err) {
+      body.innerHTML =
+        '<div style="color:#ef4444;font-size:12px;margin-bottom:8px;">' + (App.t('generationFailed') || 'فشل التوليد: ') + U.esc(err && err.message ? err.message : 'خطأ') + '</div>' +
+        '<button type="button" class="story-pop-btn" id="createWordCardBtn"><span>' + (App.t('retry') || 'إعادة المحاولة') + '</span></button>';
+    });
+  }
+
   function renderStoryResult(story) {
     var p = App.state.profile || { nativeLang: 'ar', targetLang: 'en', cefrLevel: 'B1' };
+    var sel = getEl('aiTargetLangSelect');
+    if (sel && sel.value) p.targetLang = sel.value;
+
     getEl('storyTitleText').textContent = story.title || App.t('storyResultTitle');
     var wc = (story.story || '').split(/\s+/).filter(Boolean).length;
     getEl('storySub').textContent = U.langName(p.targetLang, App.state.lang) + ' · ' + U.fmtInt(wc) + ' ' + App.t('wordsUnit') + ' · ' + (p.cefrLevel || 'B1');
     getEl('storyTargetLabel').textContent = U.langName(p.targetLang, App.state.lang);
     getEl('storyNativeLabel').textContent = U.langName(p.nativeLang, App.state.lang);
-    getEl('storyText').textContent = story.story || '';
+
+    var storyTextEl = getEl('storyText');
+    /* ضبط اتجاه لغة القصة: الألمانية/الإنجليزية = LTR من اليسار لليمين */
+    var isTargetRtl = (p.targetLang === 'ar' || p.targetLang === 'ur' || p.targetLang === 'fa');
+    storyTextEl.setAttribute('dir', isTargetRtl ? 'rtl' : 'ltr');
+    storyTextEl.style.direction = isTargetRtl ? 'rtl' : 'ltr';
+    storyTextEl.style.textAlign = isTargetRtl ? 'right' : 'left';
+    storyTextEl.innerHTML = formatStoryWithWords(story.story || '');
+
+    /* تكبير وتصغير الخط */
+    applyStoryFontSize();
+
     var tr = getEl('storyTranslation');
     tr.textContent = story.translation || '';
     tr.parentElement.style.display = story.translation ? '' : 'none';
+    var isNativeRtl = (p.nativeLang === 'ar' || p.nativeLang === 'ur' || p.nativeLang === 'fa');
+    tr.setAttribute('dir', isNativeRtl ? 'rtl' : 'ltr');
+    tr.style.direction = isNativeRtl ? 'rtl' : 'ltr';
+    tr.style.textAlign = isNativeRtl ? 'right' : 'left';
+
     var wrap = getEl('storyVocabWrap');
     var v = getEl('storyVocab');
     if (story.vocabulary && story.vocabulary.length) {
@@ -482,17 +904,336 @@
         return '<span class="story-vocab-chip"><b>' + U.esc(w.word) + '</b>' + (w.meaning ? ' — ' + U.esc(w.meaning) : '') + '</span>';
       }).join('');
     } else { wrap.style.display = 'none'; v.innerHTML = ''; }
+
+    /* إعادة تعيين زر الاستماع وحالة النافذة المنبثقة */
+    updateStoryTtsBtnState('idle');
+    hideStoryWordPopover();
   }
 
-  /* القصة → بطاقات: يملأ النص ويلتزم للتوليد مباشرة */
+  /* تحويل مفردات القصة إلى بطاقات تحت عنوان القصة مباشرة */
   function storyToCards() {
     var story = App.state.lastStory;
     if (!story || !story.story) { U.toast(App.t('aiNeedText'), 'error'); return; }
+
+    var p = App.state.profile || {};
+    var storyTitle = (story.title || '').trim() || (App.t('storiesTitle') || 'قصة تفاعلية');
+
+    if (story.vocabulary && story.vocabulary.length > 0) {
+      var btn = getEl('storiesExtractAllCardsBtn');
+      var oldHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spin"></span> <span>' + (App.t('creatingAndTranslating') || 'جاري الإنشاء...') + '</span>';
+      }
+
+      ensureStoryDeck(storyTitle).then(function (resolvedDeckId) {
+        var now = Date.now();
+        var existingFronts = {};
+        App.state.cards.forEach(function (c) {
+          if (c.deckId === resolvedDeckId && !c.deletedAt) {
+            existingFronts[(c.front || '').toLowerCase().trim()] = true;
+          }
+        });
+
+        // Get sentence pairs from story.sentences or split them
+        var pairs = (story.sentences && story.sentences.length) ? story.sentences : (App.render && App.render.pairStorySentences ? App.render.pairStorySentences(story) : []);
+
+        var newCards = [];
+        story.vocabulary.forEach(function (v) {
+          if (!v || !v.word) return;
+          var cleanWord = v.word.trim();
+          if (existingFronts[cleanWord.toLowerCase()]) return;
+
+          var matchPair = findBestSentencePair(cleanWord, pairs);
+
+          var card = {
+            id: U.uid(),
+            deckId: resolvedDeckId,
+            front: cleanWord,
+            back: (v.meaning || '').trim(),
+            example: matchPair ? (matchPair.target || '').trim() : '',
+            exampleTranslation: matchPair ? (matchPair.native || '').trim() : '',
+            tags: ['story', storyTitle],
+            lang: p.targetLang || 'de',
+            cefr: p.cefrLevel || 'B1',
+            srs: App.srs.newState(now),
+            createdAt: now,
+            updatedAt: now
+          };
+          newCards.push(card);
+          existingFronts[cleanWord.toLowerCase()] = true;
+        });
+
+        if (!newCards.length) {
+          U.toast(App.t('cardAlreadyExists'), 'info');
+          if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
+          return;
+        }
+
+        var saveOps = newCards.map(function (c) {
+          App.state.cards.push(c);
+          return App.store.saveCard(c);
+        });
+
+        return Promise.all(saveOps).then(function () {
+          App.render.renderAll();
+          closeModal('storyResultModal');
+          U.toast(App.tf('storyVocabConverted', { count: newCards.length, deck: storyTitle }), 'success', 5000);
+          if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
+        });
+      }).catch(function (err) {
+        U.toast(App.t('saveFailed') + ': ' + (err && err.message ? err.message : ''), 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
+      });
+      return;
+    }
+
+    /* Fallback if story has no vocabulary array */
     closeModal('storyResultModal');
+    switchView('add');
     setAiMode('cards');
     getEl('aiText').value = story.story;
     updateAiCount();
+    if (story.title) {
+      if (!App.aiResultMeta) App.aiResultMeta = {};
+      App.aiResultMeta.deckTitle = story.title;
+    }
     generateAi();
+  }
+
+  /* ═════════ واجهة القصص المستقلة (Stories View Handlers) ═════════ */
+  function generateStoriesViewAi() {
+    var input = getEl('storiesPromptInput');
+    var text = input ? input.value.trim() : '';
+    if (!text) { U.toast(App.t('aiNeedText') || 'يرجى كتابة موضوع للقصة', 'error'); return; }
+    if (!App.state.settings.apiKey) { U.toast(App.t('aiNoKey'), 'error'); switchView('settings'); return; }
+
+    var btn = getEl('storiesDoGenerateBtn');
+    var lbl = getEl('storiesGenBtnLabel');
+    if (btn) btn.disabled = true;
+    if (lbl) lbl.textContent = 'جاري كتابة القصة وتوليد المفردات...';
+
+    var cefrSel = getEl('storiesCefrSelect');
+    if (cefrSel && App.state.profile) {
+      App.state.profile.cefrLevel = cefrSel.value;
+      App.store.saveProfile(App.state.profile);
+    }
+
+    App.ai.generateStory(text).then(function (story) {
+      App.state.lastStory = story;
+      try { localStorage.setItem('flashki_last_story', JSON.stringify(story)); } catch (err) {}
+      App.render.renderStoriesView();
+      U.toast('✓ تم توليد القصة بنجاح!', 'success');
+      var creator = getEl('viewStoriesCreator');
+      if (creator) creator.style.display = 'none';
+      if (input) input.value = '';
+    }).catch(function (e) {
+      var m = e && e.message ? String(e.message) : '';
+      var msg = (App.ai && App.ai.isBusyError && App.ai.isBusyError(m))
+        ? App.t('aiBusy') + (m ? ' — ' + m : '')
+        : ((e && e.message) ? App.t('aiFailed') + e.message : App.t('aiFailed'));
+      U.toast(msg, 'error', 6000);
+    }).then(function () {
+      if (btn) btn.disabled = false;
+      if (lbl) lbl.textContent = App.t('storiesGenBtn');
+    });
+  }
+
+  function openStoryCreator() {
+    var creator = getEl('viewStoriesCreator');
+    var reader = getEl('viewStoriesReader');
+    var empty = getEl('viewStoriesEmpty');
+    if (creator) {
+      creator.style.display = 'block';
+      var sInp = getEl('storiesPromptInput');
+      if (sInp) { sInp.focus(); sInp.select(); }
+    }
+    if (reader) reader.style.display = 'none';
+    if (empty) empty.style.display = 'none';
+  }
+
+  /* ═════════ إدارة وتعديل كلمات القسم المختار (Deck Cards Modal) ═════════ */
+  function openDeckCardsModal(deckId) {
+    if (!deckId) return;
+    App.state.managingDeckId = deckId;
+    var searchInput = getEl('deckCardsSearchInput');
+    if (searchInput) searchInput.value = '';
+    App.render.renderDeckCardsList(deckId, '');
+    showModal('deckCardsModal');
+  }
+
+  var inlineCardImages = {};
+
+  function enterInlineCardEdit(cardId) {
+    var item = getEl('deckCardItem_' + cardId);
+    if (!item) return;
+    var c = App.state.cards.filter(function (x) { return x.id === cardId; })[0];
+    if (!c) return;
+    delete inlineCardImages[cardId];
+
+    var p = App.state.profile || {};
+    var targetName = U.langName(c.lang || p.targetLang || 'de', App.state.lang);
+    var nativeName = U.langName(p.nativeLang || 'ar', App.state.lang);
+
+    item.innerHTML =
+      '<div class="deck-card-inline-edit">' +
+        '<div class="deck-card-image-edit-row">' +
+          '<div class="deck-card-thumb-wrap" id="inlineThumbWrap_' + c.id + '">' +
+            (c.imagePath ? '<img class="deck-card-thumb" id="inlineImg_' + c.id + '" data-img-path="' + U.esc(c.imagePath) + '" alt="" />' : '<div class="deck-card-no-img">' + App.t('noImageYet') + '</div>') +
+          '</div>' +
+          '<div class="deck-card-image-edit-actions">' +
+            '<label class="btn-ghost btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">' +
+              '<span>📷 ' + (c.imagePath ? App.t('changeImage') : App.t('addImage')) + '</span>' +
+              '<input type="file" id="inlineImgInput_' + c.id + '" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" />' +
+            '</label>' +
+            (c.imagePath ? '<button type="button" class="btn-ghost btn-sm text-danger" id="inlineRemoveImg_' + c.id + '">' + App.t('removeImageBtn') + '</button>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="deck-card-edit-grid">' +
+          '<div class="field">' +
+            '<label>' + U.esc(App.tf('lblFrontLang', { lang: targetName })) + ':</label>' +
+            '<input type="text" class="deck-edit-input" id="editFront_' + c.id + '" value="' + U.esc(c.front || '') + '" />' +
+          '</div>' +
+          '<div class="field">' +
+            '<label>' + U.esc(App.tf('lblBackLang', { lang: nativeName })) + ':</label>' +
+            '<input type="text" class="deck-edit-input" id="editBack_' + c.id + '" value="' + U.esc(c.back || '') + '" />' +
+          '</div>' +
+        '</div>' +
+        '<div class="deck-card-edit-grid">' +
+          '<div class="field">' +
+            '<label>' + U.esc(App.t('lblContextEx')) + ':</label>' +
+            '<input type="text" class="deck-edit-input" id="editEx_' + c.id + '" value="' + U.esc(c.example || '') + '" placeholder="' + U.esc(App.t('examplePh')) + '" />' +
+          '</div>' +
+          '<div class="field">' +
+            '<label>' + U.esc(App.t('lblContextExTr')) + ':</label>' +
+            '<input type="text" class="deck-edit-input" id="editExTr_' + c.id + '" value="' + U.esc(c.exampleTranslation || '') + '" placeholder="' + U.esc(App.t('exampleTranslationPh')) + '" />' +
+          '</div>' +
+        '</div>' +
+        '<div class="deck-card-edit-actions">' +
+          '<button type="button" class="btn-primary btn-sm" data-action="save-inline-card" data-id="' + c.id + '">💾 ' + U.esc(App.t('saveChanges')) + '</button>' +
+          '<button type="button" class="btn-ghost btn-sm" data-action="cancel-inline-card" data-id="' + c.id + '">' + U.esc(App.t('cancel')) + '</button>' +
+        '</div>' +
+      '</div>';
+
+    if (c.imagePath) {
+      var thumbImg = getEl('inlineImg_' + c.id);
+      if (thumbImg) {
+        if (c.imagePath.indexOf('data:') === 0) thumbImg.src = c.imagePath;
+        else App.handlers.imagePathToSrc(c.imagePath).then(function (src) { if (src) thumbImg.src = src; });
+      }
+    }
+
+    var inp = getEl('inlineImgInput_' + c.id);
+    if (inp) {
+      inp.addEventListener('change', function () {
+        var file = this.files && this.files[0];
+        if (!file) return;
+        U.compressImage(file, 1080, 0.82).then(function (res) {
+          inlineCardImages[cardId] = res;
+          var wrap = getEl('inlineThumbWrap_' + cardId);
+          if (wrap) wrap.innerHTML = '<img class="deck-card-thumb" src="' + res.dataUrl + '" alt="" />';
+          U.toast('✓ تم ضغط وتحديث الصورة', 'success');
+        });
+      });
+    }
+
+    var remBtn = getEl('inlineRemoveImg_' + c.id);
+    if (remBtn) {
+      remBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        inlineCardImages[cardId] = 'removed';
+        var wrap = getEl('inlineThumbWrap_' + cardId);
+        if (wrap) wrap.innerHTML = '<div class="deck-card-no-img">' + App.t('noImageYet') + '</div>';
+        this.style.display = 'none';
+      });
+    }
+
+    var fInput = getEl('editFront_' + c.id);
+    if (fInput) fInput.focus();
+  }
+
+  function saveInlineCard(cardId) {
+    var c = App.state.cards.filter(function (x) { return x.id === cardId; })[0];
+    if (!c) return;
+    var frontVal = (getEl('editFront_' + c.id) || {}).value || '';
+    var backVal = (getEl('editBack_' + c.id) || {}).value || '';
+    var exVal = (getEl('editEx_' + c.id) || {}).value || '';
+    var exTrVal = (getEl('editExTr_' + c.id) || {}).value || '';
+
+    if (!frontVal.trim() || !backVal.trim()) {
+      U.toast(App.t('needFrontBack') || 'يجب ملء الوجه الأول والوجه الثاني', 'error');
+      return;
+    }
+
+    c.front = frontVal.trim();
+    c.back = backVal.trim();
+    c.example = exVal.trim();
+    c.exampleTranslation = exTrVal.trim();
+    c.updatedAt = Date.now();
+
+    var imgAction = inlineCardImages[cardId];
+    var imgPromise = Promise.resolve();
+    if (imgAction === 'removed') {
+      c.imagePath = null;
+    } else if (imgAction && imgAction.dataUrl) {
+      if (!isTauri()) {
+        c.imagePath = imgAction.dataUrl;
+      } else {
+        imgPromise = window.__TAURI__.core.invoke('save_card_image', { cardId: c.id, dataBase64: imgAction.dataUrl })
+          .then(function (rel) { c.imagePath = rel; })
+          .catch(function (e) {
+            U.toast(App.t('imageSaveFailed') + (e && e.message ? ' — ' + e.message : ''), 'error');
+          });
+      }
+    }
+
+    imgPromise.then(function () {
+      delete inlineCardImages[cardId];
+      return App.store.saveCard(c);
+    }).then(function () {
+      U.toast(App.t('savedOk') || '✓ تم حفظ التعديل بنجاح', 'success');
+      var search = (getEl('deckCardsSearchInput') || {}).value || '';
+      App.render.renderDeckCardsList(App.state.managingDeckId, search);
+      App.render.renderAll();
+    }).catch(function (err) {
+      U.toast(App.t('saveFailed') + ': ' + (err && err.message ? err.message : ''), 'error');
+    });
+  }
+
+  function deleteDeckCard(cardId) {
+    if (!cardId) return;
+    App.store.deleteCard(cardId).then(function () {
+      App.state.cards = App.state.cards.filter(function (c) { return c.id !== cardId; });
+      U.toast('✓ تم حذف الكلمة من القسم', 'info');
+      var search = (getEl('deckCardsSearchInput') || {}).value || '';
+      App.render.renderDeckCardsList(App.state.managingDeckId, search);
+      App.render.renderAll();
+    });
+  }
+
+  function addEmptyDeckCard() {
+    var deckId = App.state.managingDeckId;
+    if (!deckId) return;
+    var now = Date.now();
+    var p = App.state.profile || {};
+    var card = {
+      id: U.uid(),
+      deckId: deckId,
+      front: '',
+      back: '',
+      example: '',
+      exampleTranslation: '',
+      tags: [],
+      cefr: p.cefrLevel || 'B1',
+      srs: App.srs.newState(now),
+      createdAt: now,
+      updatedAt: now
+    };
+    App.state.cards.unshift(card);
+    var searchInput = getEl('deckCardsSearchInput');
+    if (searchInput) searchInput.value = '';
+    App.render.renderDeckCardsList(deckId, '');
+    enterInlineCardEdit(card.id);
   }
 
   /* فهرس البطاقة قيد التعديل داخل نافذة النتائج (قبل الحفظ — لا علاقة له بقاعدة البيانات) */
@@ -747,6 +1488,9 @@
       a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
       U.toast(App.t('exportedOk'), 'success');
+    }).catch(function (err) {
+      console.error('Export error:', err);
+      U.toast(App.t('importFailed') || 'فشل التصدير', 'error');
     });
   }
 
@@ -757,15 +1501,20 @@
       try { json = JSON.parse(reader.result); } catch (e) { U.toast(App.t('importFailed'), 'error'); return; }
       if (!confirm(App.t('wipeConfirm1'))) return;
       App.store.importData(json).then(function () {
-        return Promise.all([App.store.getDecks(), App.store.getCards(), App.store.getReviews(), App.store.getSettings()]);
+        return Promise.all([App.store.getDecks(), App.store.getCards(), App.store.getReviews(), App.store.getSettings(), App.store.getProfile()]);
       }).then(function (r) {
         App.state.decks = r[0]; App.state.cards = r[1]; App.state.reviews = r[2];
         App.state.settings = r[3];
+        if (r[4]) App.state.profile = r[4];
         applyTheme();
-        App.i18n.applyLang(App.state.settings.lang);
+        App.i18n.applyLang(App.state.settings.lang || 'ar');
         App.render.renderAll();
+        if (App.render.updateLangLabels) App.render.updateLangLabels();
         U.toast(App.t('importedOk'), 'success');
-      }).catch(function () { U.toast(App.t('importFailed'), 'error'); });
+      }).catch(function (err) {
+        console.error('Import error:', err);
+        U.toast(App.t('importFailed'), 'error');
+      });
     };
     reader.readAsText(file);
   }
@@ -918,19 +1667,43 @@
 
   /* ---------- init ---------- */
   function init() {
-    /* رابط Google AI Studio: في Tauri يفتح بالمتصفح الخارجي عبر opener، وفي المتصفح بشكل طبيعي */
-    var aiLink = getEl('aiStudioLink');
-    if (aiLink) {
-      aiLink.addEventListener('click', function (e) {
-        try {
-          var T = window.__TAURI__;
-          var opener = T && (T.opener || T.shell);
-          if (opener && (opener.openUrl || opener.open)) {
-            e.preventDefault();
-            var url = aiLink.getAttribute('href');
-            if (opener.openUrl) opener.openUrl(url); else opener.open(url);
-          }
-        } catch (err) { /* المتصفح: سلوك الرابط الطبيعي */ }
+    /* رابط Google AI Studio + زر تحميل التطبيق: في Tauri يفتحان بالمتصفح الخارجي */
+    ['aiStudioLink', 'downloadAppBtn'].forEach(function (id) {
+      var el = getEl(id);
+      if (el) {
+        el.addEventListener('click', function (e) {
+          try {
+            var T = window.__TAURI__;
+            var opener = T && (T.opener || T.shell);
+            if (opener && (opener.openUrl || opener.open)) {
+              e.preventDefault();
+              var url = el.getAttribute('href');
+              if (opener.openUrl) opener.openUrl(url); else opener.open(url);
+            }
+          } catch (err) { /* المتصفح: سلوك الرابط الطبيعي */ }
+        });
+      }
+    });
+
+    /* سحب وإفلات الصور في منطقة رفع الصور */
+    var uploadZone = getEl('cardUploadZone');
+    if (uploadZone) {
+      ['dragenter', 'dragover'].forEach(function (evt) {
+        uploadZone.addEventListener(evt, function (e) {
+          e.preventDefault(); e.stopPropagation();
+          uploadZone.classList.add('drag-over');
+        });
+      });
+      ['dragleave', 'drop'].forEach(function (evt) {
+        uploadZone.addEventListener(evt, function (e) {
+          e.preventDefault(); e.stopPropagation();
+          uploadZone.classList.remove('drag-over');
+        });
+      });
+      uploadZone.addEventListener('drop', function (e) {
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+          pickCardImage(e.dataTransfer.files[0]);
+        }
       });
     }
     document.addEventListener('click', function (e) {
@@ -955,11 +1728,10 @@
 
       /* 4) study controls */
       if (t.closest('#exitStudy')) { e.preventDefault(); App.study.exit(); return; }
-      if (t.closest('#showAnswer')) { e.preventDefault(); App.study.flip(); return; }
-      var rateBtn = t.closest('.rate-btn');
+      var rateBtn = t.closest('.rate-btn, .srs-btn');
       if (rateBtn) { e.preventDefault(); App.study.rate(rateBtn.getAttribute('data-rate')); return; }
-      if (t.closest('#flashCard') && !t.closest('.flash-tts') && !t.closest('#audioBadge') && !t.closest('.rate-btn')) {
-        /* النقر على البطاقة يقلب في الاتجاهين دائماً (أمامي ← خلفي ← أمامي...) */
+      if (t.closest('#flashCard') && !t.closest('.fx-audio-btn') && !t.closest('.fx-example-audio')) {
+        /* النقر على البطاقة (أو زر القلب) يقلب في الاتجاهين دائماً (أمامي ← خلفي ← أمامي...) */
         App.study.flip();
         return;
       }
@@ -985,7 +1757,9 @@
       var ttsMini = t.closest('.tts-mini');
       if (ttsMini) {
         e.preventDefault();
-        if (ttsMini.getAttribute('data-tts') === 'Question') App.tts.speak(getEl('frontInput').value, 'front');
+        var whichTts = ttsMini.getAttribute('data-tts');
+        if (whichTts === 'Question') App.tts.speak(getEl('frontInput').value, 'front');
+        else if (whichTts === 'Example') App.tts.speak(getEl('exampleInput') ? getEl('exampleInput').value : '', 'front');
         else App.tts.speak(getEl('backInput').value, 'back');
         return;
       }
@@ -996,7 +1770,21 @@
         var ss = App.state.session;
         if (ss && ss.queue[ss.idx]) {
           var cur = ss.queue[ss.idx];
-          App.tts.speak(ss.dir === 'reverse' ? cur.back : cur.front, ss.dir === 'reverse' ? 'back' : 'front');
+          var userVoice = (ss.dir === 'reverse') ? cur.audioBack : cur.audioFront;
+          if (userVoice) {
+            App.audio.playSource(userVoice);
+          } else {
+            App.tts.speak(ss.dir === 'reverse' ? cur.back : cur.front, ss.dir === 'reverse' ? 'back' : 'front');
+          }
+        }
+        return;
+      }
+      /* نطق جملة المثال على الوجه الخلفي */
+      if (t.closest('#exampleAudioBtn')) {
+        e.preventDefault();
+        var sx = App.state.session;
+        if (sx && sx.queue[sx.idx] && sx.queue[sx.idx].example) {
+          App.tts.speak(sx.queue[sx.idx].example, 'front');
         }
         return;
       }
@@ -1004,7 +1792,12 @@
       if (t.closest('#translateBtn')) { e.preventDefault(); doTranslate(); return; }
 
       /* رفع صورة البطاقة + إزالتها */
-      if (t.closest('#imageUploadBtn')) { e.preventDefault(); getEl('imageFileInput').click(); return; }
+      if (t.closest('#cardUploadZone') || t.closest('#imageUploadBtn')) {
+        e.preventDefault();
+        var inp = getEl('imageFileInput');
+        if (inp) inp.click();
+        return;
+      }
       if (t.closest('#cardImageRemove')) {
         e.preventDefault();
         var hadImage = false;
@@ -1013,6 +1806,14 @@
         }
         resetImageUI();
         imageRemoved = hadImage; /* في التعديل: إزالة فعلية تُحفظ؛ في الإضافة: تصفير فقط */
+        return;
+      }
+
+      /* زر إخفاء وإظهار الشريط الجانبي */
+      if (t.closest('#sidebarToggleBtn')) {
+        e.preventDefault();
+        var appEl = getEl('app');
+        if (appEl) appEl.classList.toggle('sidebar-hidden');
         return;
       }
 
@@ -1026,8 +1827,38 @@
       /* وضع AI: بطاقات / قصة */
       var aiModeOpt = t.closest('.ai-mode-opt');
       if (aiModeOpt) { e.preventDefault(); setAiMode(aiModeOpt.getAttribute('data-ai-mode')); return; }
-      if (t.closest('#storyTtsBtn')) { e.preventDefault(); var st = App.state.lastStory; if (st && st.story) App.tts.speak(st.story, 'front'); return; }
-      if (t.closest('#storyToCardsBtn')) { e.preventDefault(); storyToCards(); return; }
+      if (t.closest('#storyTtsBtn') || t.closest('#storiesTtsBtn')) { e.preventDefault(); toggleStoryAudio(); return; }
+      if (t.closest('#storyToCardsBtn') || t.closest('#storiesExtractAllCardsBtn')) { e.preventDefault(); storyToCards(); return; }
+      if (t.closest('#storyFontInc') || t.closest('#storiesFontInc')) { e.preventDefault(); changeStoryFontSize(10); return; }
+      if (t.closest('#storyFontDec') || t.closest('#storiesFontDec')) { e.preventDefault(); changeStoryFontSize(-10); return; }
+      if (t.closest('#storiesToggleInterlinearBtn')) {
+        e.preventDefault();
+        App.state.interlinearStoryMode = !App.state.interlinearStoryMode;
+        App.render.renderStoriesView();
+        return;
+      }
+      if (t.closest('#viewStoriesNewBtn') || t.closest('#storiesEmptyNewBtn') || t.closest('#storiesSwitchToNewBtn') || t.closest('#storiesBottomNewBtn')) {
+        e.preventDefault();
+        openStoryCreator();
+        return;
+      }
+      if (t.closest('#storiesDoGenerateBtn')) {
+        e.preventDefault();
+        generateStoriesViewAi();
+        return;
+      }
+      if (t.closest('#deckCardsAddBtn')) {
+        e.preventDefault();
+        addEmptyDeckCard();
+        return;
+      }
+      if (t.closest('#createWordCardBtn')) { e.preventDefault(); convertWordToCard(); return; }
+      if (t.closest('#closeStoryPopBtn')) { e.preventDefault(); hideStoryWordPopover(); return; }
+      var storyWordEl = t.closest('.story-word');
+      if (storyWordEl) { e.preventDefault(); e.stopPropagation(); openStoryWordPopover(storyWordEl); return; }
+      if (!t.closest('#storyWordPopover') && !t.closest('.story-word')) {
+        hideStoryWordPopover();
+      }
 
       /* 6) add tabs */
       var addTab = t.closest('.add-tab');
@@ -1090,8 +1921,10 @@
         e.preventDefault();
         var rc = recAction.closest('.voice-recorder');
         if (rc) {
-          if (recAction.classList.contains('del')) App.audio.clear(rc);
-          else App.audio.play(rc);
+          if (recAction.classList.contains('del')) {
+            App.audio.clear(rc);
+            rc.classList.add('del-clicked');
+          } else App.audio.play(rc);
         }
         return;
       }
@@ -1100,6 +1933,38 @@
       var act = t.closest('[data-action]');
       if (act) {
         var action = act.getAttribute('data-action');
+        if (action === 'open-story-creator') {
+          e.preventDefault();
+          if (App.state.lastView !== 'stories') App.switchView('stories');
+          openStoryCreator();
+          return;
+        }
+        if (action === 'manage-deck-cards') {
+          e.preventDefault(); e.stopPropagation();
+          openDeckCardsModal(act.getAttribute('data-id'));
+          return;
+        }
+        if (action === 'edit-inline-card') {
+          e.preventDefault(); e.stopPropagation();
+          enterInlineCardEdit(act.getAttribute('data-id'));
+          return;
+        }
+        if (action === 'save-inline-card') {
+          e.preventDefault(); e.stopPropagation();
+          saveInlineCard(act.getAttribute('data-id'));
+          return;
+        }
+        if (action === 'cancel-inline-card') {
+          e.preventDefault(); e.stopPropagation();
+          var s = (getEl('deckCardsSearchInput') || {}).value || '';
+          App.render.renderDeckCardsList(App.state.managingDeckId, s);
+          return;
+        }
+        if (action === 'del-deck-card') {
+          e.preventDefault(); e.stopPropagation();
+          deleteDeckCard(act.getAttribute('data-id'));
+          return;
+        }
         if (action === 'new-deck') { e.preventDefault(); openCreateDeck(); return; }
         if (action === 'edit-deck' || action === 'deck-menu') { e.preventDefault(); openEditDeck(act.getAttribute('data-id')); return; }
         if (action === 'edit-card') { e.preventDefault(); openEditCard(act.getAttribute('data-id')); return; }
@@ -1319,11 +2184,22 @@
         persistSettings();
         App.i18n.applyLang(el.value);
         App.render.renderAll();
+      } else if (el.id === 'deckSelect') {
+        if (el.value === '__new__') {
+          openCreateDeck();
+        }
       } else if (el.id === 'aiDeckSelect') {
         syncAiDeckTitle();
       } else if (el.id === 'modelSelect') {
         App.state.settings.model = el.value;
         persistSettings();
+        U.toast(App.t('settingsSaved'), 'success');
+      } else if (el.id === 'aiTargetLangSelect') {
+        if (!App.state.profile) App.state.profile = {};
+        App.state.profile.targetLang = el.value;
+        App.store.saveProfile(App.state.profile);
+        App.render.renderSettings();
+        App.render.updateLangLabels();
         U.toast(App.t('settingsSaved'), 'success');
       } else if (el.id === 'nativeLangSelect' || el.id === 'targetLangSelect') {
         if (!App.state.profile) return;
@@ -1368,6 +2244,11 @@
       var el = e.target;
       if (!el) return;
       if (el.id === 'searchInput') { App.debouncedSearch(); }
+      else if (el.id === 'deckCardsSearchInput') {
+        if (App.state.managingDeckId && App.render.renderDeckCardsList) {
+          App.render.renderDeckCardsList(App.state.managingDeckId, el.value);
+        }
+      }
       else if (el.id === 'aiText') { updateAiCount(); }
       else if (el.id === 'frontInput' || el.id === 'backInput') { updatePreview(); }
       else if (el.id === 'apiKeyInput') {
@@ -1393,7 +2274,8 @@
           var r = getEl('rateRow');
           if (r && r.classList.contains('show')) {
             e.preventDefault();
-            App.study.rate(['again', 'hard', 'good', 'easy'][parseInt(e.key, 10) - 1]);
+            /* ترتيب أزرار التصميم الجديد: 1=سهل · 2=متوسط · 3=صعب · 4=صعب جداً */
+            App.study.rate(['easy', 'good', 'hard', 'again'][parseInt(e.key, 10) - 1]);
           }
         }
       } else if (App.state.lastView === 'search' && document.activeElement !== getEl('searchInput') && e.key === '/') {
@@ -1413,6 +2295,9 @@
     doTranslate: doTranslate,
     setAiMode: setAiMode,
     imagePathToSrc: imagePathToSrc,
+    formatStoryWithWords: formatStoryWithWords,
+    applyStoriesViewFontSize: applyStoryFontSize,
+    openStoryCreator: openStoryCreator,
     _internal: { saveManualCard: saveManualCard, doExport: doExport, generateAi: generateAi, generateStoryAi: generateStoryAi, checkAppUpdate: checkAppUpdate, nudgeFontSize: nudgeFontSize }
   };
   App.updateAiModeUi = updateAiModeUi;

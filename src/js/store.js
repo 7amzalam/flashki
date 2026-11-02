@@ -9,7 +9,7 @@
 
   var DEFAULT_SETTINGS = {
     lang: 'ar', theme: 'dark', fontSize: 0, animations: true,
-    apiKey: '', model: 'gemini-3.8-flash', keyStatus: 'unchecked',
+    apiKey: '', model: 'gemini-3.6-flash', keyStatus: 'unchecked',
     ttsRate: 1, autoTts: true,
     autoTwoSided: true, dailyNew: 20, aiCount: 'auto',
     cefrLevel: 'B1', translationAutoEnabled: true,
@@ -158,20 +158,26 @@
   function saveNewIntro(v) { return App.db.kvSet('newIntro', v); }
 
   function exportData() {
-    return Promise.all([getDecks(), getCards(), getReviews(), App.db.kvGet('settings')]).then(function (r) {
+    return Promise.all([getDecks(), getCards(), getReviews(), App.db.kvGet('settings'), getProfile()]).then(function (r) {
       var settings = Object.assign({}, r[3] || {});
       delete settings.apiKey; /* never export the API key */
-      return { app: 'Flashki', version: 1, exportedAt: new Date().toISOString(), decks: r[0], cards: r[1], reviews: r[2], settings: settings };
+      var profile = Object.assign({}, r[4] || {});
+      return { app: 'Flashki', version: 1, exportedAt: new Date().toISOString(), decks: r[0], cards: r[1], reviews: r[2], settings: settings, profile: profile };
     });
   }
 
   function exportWithAudio(data) {
-    /* cards may hold Blob audio — convert to base64 for JSON export */
+    /* cards may hold Blob audio or relative path images — convert to base64 for JSON export */
     var jobs = data.cards.map(function (c) {
-      var out = Object.assign({}, c), p1 = Promise.resolve(), p2 = Promise.resolve();
+      var out = Object.assign({}, c), p1 = Promise.resolve(), p2 = Promise.resolve(), p3 = Promise.resolve();
       if (c.audioFront instanceof Blob) p1 = U.blobToDataURL(c.audioFront).then(function (d) { out.audioFront = d; });
       if (c.audioBack instanceof Blob) p2 = U.blobToDataURL(c.audioBack).then(function (d) { out.audioBack = d; });
-      return Promise.all([p1, p2]).then(function () { return out; });
+      if (c.imagePath && c.imagePath.indexOf('data:') !== 0 && App.handlers && App.handlers.imagePathToSrc) {
+        p3 = App.handlers.imagePathToSrc(c.imagePath).then(function (src) {
+          if (src) out.imagePath = src;
+        }).catch(function () {});
+      }
+      return Promise.all([p1, p2, p3]).then(function () { return out; });
     });
     return Promise.all(jobs).then(function (cards) { data.cards = cards; return data; });
   }
@@ -192,6 +198,9 @@
         ops.push(App.db.put('cards', card));
       });
       (json.reviews || []).forEach(function (r) { delete r.id; ops.push(App.db.add('reviews', r)); });
+      if (json.profile) {
+        ops.push(saveProfile(json.profile));
+      }
       if (json.settings) {
         return Promise.all(ops).then(function () {
           return getSettings().then(function (cur) {

@@ -1,147 +1,164 @@
-# Flashki — Smart Flashcard App (Tauri 2)
+# Flashki — تطبيق البطاقات الذكية والقصص التفاعلية (Tauri 2 + SQLite)
 
-A **fully local** spaced repetition flashcard app: all your data is stored on your device, serverless, with AI card generation (Google Gemini only) via an in-app backend core.
+<p align="center">
+  <img src="app-icon.png" width="128" height="128" alt="Flashki Logo" />
+</p>
 
-## Technical Architecture
+تطبيق مكتبي متكامل مفتوح المصدر لتعلم اللغات وحفظ المفردات بتقنية **التكرار المتباعد (Spaced Repetition - SM-2)** وقراءة **القصص التفاعلية المدعومة بالذكاء الاصطناعي (Google Gemini)**، مع تخزين محلي آمن وسريع 100% عبر قاعدة بيانات **SQLite** ونطق صوتي طبيعي عالي الجودة عبر **Edge TTS**.
 
-| Layer | Technology |
+---
+
+## 🌟 الميزات الرئيسية (Key Features)
+
+### 1. خوارزمية التكرار المتباعد الذكية (SM-2 Spaced Repetition)
+- جدولة علمية دقيقة لمراجعة الكلمات وفق استجابة الذاكرة (أزرار: *إعادة / صعب / جيد / سهل*).
+- دعم بطاقات ذات خلفية مصورة مع تعتيم سينمائي أنيق وطبقة إبراز الكلمة.
+- تسجيل صوتي خاص لكل بطاقة لممارسة النطق والاستماع.
+- دعم مستويات الإطار الأوروبي المشترك للغات (CEFR: A1, A2, B1, B2, C1, C2) لتنظيم التعلم.
+
+### 2. قسم القصص التفاعلية المستقل (Interactive Stories Reader)
+- توليد قصص تفاعلية شيقة وفق أي موضوع أو مفردات يختارها المتعلم وبالمستوى المناسب.
+- **نظام القراءة ثلاثي الطبقات:**
+  1. نص القصة باللغة المستهدفة (مع محاذاة LTR كاملة تمنع تطاير علامات الترقيم).
+  2. وضع الترجمة المتوازية لكل جملة تحتها مباشرة (Interlinear Translation).
+  3. استخراج المفردات المفتاحية تلقائياً أسفل القصة.
+- **تحويل فوري لأي كلمة إلى بطاقة:** النقر على أي كلمة داخل القصة يفتح نافذة تفاعلية تتيح سماع نطقها، عرض معناها ومثالها السياقي، وحفظها فوراً كبطاقة تحت تصنيف القصة مع إرجاع الأفعال لأصلها (Infinitive) والأسماء لأدوات تعريفها (der/die/das).
+- قارئ صوتي متتابع عبر طابور جمل ذكي يدعم Google TTS و Microsoft Edge TTS.
+
+### 3. توليد البطاقات الآلي بالذكاء الاصطناعي (Gemini AI)
+- تحويل أي نص أو مقال إلى بطاقات تعليمية متكاملة بضغطة زر واحدة.
+- استخراج أمثلة سياقية باللغة المستهدفة وترجمتها المباشرة إلى لغتك الأم.
+- اختيار القسم المناسب أو إنشاء قسم جديد تلقائياً بعنوان مستخرج من سياق النص.
+
+### 4. إدارة شاملة للأقسام والكلمات (Deck & Word Management)
+- نافذة مخصصة لتعديل كلمات وجمل وصور كل قسم على حدة.
+- ضغط الصور آلياً باستخدام Canvas لتقليل الحجم بنسبة تفوق 90% مع الحفاظ على دقة وضوح فائقة.
+- خيار فوري لإنشاء قسم جديد مباشرة من داخل نموذج الإدخال السريع.
+
+### 5. دعم 8 لغات عالمية بالكامل (Multi-Language UI)
+- واجهة ثنائية الاتجاه (RTL & LTR) مترجمة بنسبة 100% إلى:
+  - 🇸🇦 العربية (Arabic)
+  - 🇺🇸 الإنجليزية (English)
+  - 🇩🇪 الألمانية (German)
+  - 🇫🇷 الفرنسية (French)
+  - 🇪🇸 الإسبانية (Spanish)
+  - 🇹🇷 التركية (Turkish)
+  - 🇮🇷 الفارسية (Persian)
+  - 🇵🇰 الأردية (Urdu)
+
+### 6. تخزين وأداء محلي فائق السرعة
+- قاعدة بيانات **SQLite** حقيقية (WAL mode) تضمن أمان البيانات وعدم تلفها، مدعومة بمحرك **sql.js WASM** عند المعاينة في المتصفح.
+- تصدير واستيراد النسخ الاحتياطية بصيغة JSON مع كامل التسجيلات الصوتية والصور.
+- وضع التركيز: إمكانية إخفاء الشريط الجانبي بنقرة زر واحدة للتركيز التام على القراءة والمراجعة.
+
+---
+
+## 🛠️ البنية التقنية (Architecture)
+
+| الطبقة | التقنية المستخدمة |
 |---|---|
-| Frontend | Pure HTML/CSS/JS (Original design) |
-| Storage | Local IndexedDB on user device |
-| Algorithm | SM-2 for spaced repetition (Anki style) |
-| AI Backend | In-app Rust core connecting to Gemini only |
-| Packaging | Tauri 2 (Windows · Linux · macOS · Android soon) |
+| **الواجهة الأمامية (Frontend)** | Vanilla JavaScript (ES6+), HTML5, Modern CSS Variables (خالي من الحزم والـ bundlers المعقدة) |
+| **محرك التخزين (Database)** | SQLite 3 عبر `tauri-plugin-sql` (ملف `flashki.db` محلي) مع fallback تلقائي لـ `sql.js WASM` |
+| **إطار التطبيق (Desktop Shell)** | Tauri 2 (Rust Core) — خفيف جداً، استهلاك رام منخفض وأمان عالٍ |
+| **محرك الذكاء الاصطناعي (AI Core)** | Google Gemini API (2.5 Flash / Flash Lite / Pro) عبر استدعاءات آمنة من قلب التطبيق |
+| **محرك النطق الصوتي (TTS)** | Microsoft Edge TTS عالي الجودة + Web Speech API المحلي + Google TTS Fallback |
+| **خوارزمية المراجعة** | SM-2 Spaced Repetition Algorithm |
 
+---
+
+## 🚀 التثبيت والتشغيل للمطورين
+
+### المتطلبات الأساسية:
+1. **Node.js**: الإصدار 20 فأعلى (LTS) من [nodejs.org](https://nodejs.org).
+2. **Rust & Cargo**: من [rustup.rs](https://rustup.rs).
+3. **أدوات النظام (Linux):**
+   ```bash
+   sudo apt update
+   sudo apt install -y build-essential curl wget file libx11-dev libasound2-dev \
+     libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+   ```
+
+### 1. تشغيل التطبيق في وضع التطوير (Desktop Development):
+```bash
+# تثبيت التبعيات
+npm install
+
+# تشغيل التطبيق عبر Tauri ونافذة سطح المكتب
+npm run dev
 ```
-flashki/
-├── src/                 ← Frontend
-│   ├── index.html
-│   ├── css/             ← Styles + Local fonts (Tajawal)
-│   ├── js/              ← Logic: db, srs, store, tts, audio, ai, render, handlers, app
-│   └── assets/fonts/
-├── src-tauri/           ← Tauri core (Rust)
-│   ├── src/main.rs      ← Entry point
-│   ├── src/lib.rs       ← gemini_generate command (Connecting to Gemini from backend)
-│   ├── tauri.conf.json  ← Window and bundle settings
-│   ├── capabilities/    ← Window permissions
-│   └── icons/           ← App icons (all sizes)
+
+### 2. تشغيل واجهة الويب السريعة في المتصفح:
+```bash
+npm run web
+# افتح المتصفح على: http://localhost:5173
+```
+
+### 3. بناء النسخة الإنتاجية القابلة للتوزيع (Production Build):
+```bash
+npm run build
+```
+تُنتج الحزم التثبيتية جاهزة للتوزيع في المسارات:
+- **Windows:** `src-tauri/target/release/bundle/nsis/*.exe` أو `.msi`
+- **Linux:** `src-tauri/target/release/bundle/deb/*.deb` أو `.AppImage`
+- **macOS:** `src-tauri/target/release/bundle/dmg/*.dmg`
+
+---
+
+## 🔑 تفعيل الذكاء الاصطناعي (Gemini)
+
+1. احصل على مفتاح مجاني من [Google AI Studio](https://aistudio.google.com/apikey).
+2. افتح التطبيق وانتقل إلى: **الإعدادات ← محرك الذكاء الاصطناعي**.
+3. الصق المفتاح واضغط **حفظ واختبار الاتصال**.
+4. يتم تشفير المفتاح وتخزينه **محلياً فقط على جهازك** دون مشاركته مع أي خادم خارجي.
+
+---
+
+## 📁 هيكل المشروع
+
+```text
+flashki-main/
+├── src/                      # الواجهة الأمامية (HTML / CSS / JavaScript)
+│   ├── index.html            # بنية الشاشات والقوالب
+│   ├── css/
+│   │   └── styles.css        # التنسيقات ونظام السمات الداكن والفاتح وتنسيق RTL/LTR
+│   ├── js/
+│   │   ├── app.js            # إدارة دورة حياة التطبيق وجلسات المراجعة
+│   │   ├── db.js             # طبقة قاعدة بيانات SQLite الموحدة
+│   │   ├── store.js          # واجهة إدارة الكروت والأقسام والمراجعات
+│   │   ├── srs.js            # خوارزمية SM-2 لجدولة التكرار المتباعد
+│   │   ├── ai.js             # معالجة النصوص وتوليد البطاقات والقصص مع Gemini
+│   │   ├── tts.js            # محركات تحويل النص إلى كلام (Edge TTS / Google)
+│   │   ├── audio.js          # مسجل الصوت ومعالجة الميكروفون
+│   │   ├── render.js         # محرك الرسم وتحديث واجهة المستخدم
+│   │   ├── handlers.js       # معالجة الأحداث والمدخلات وضغط الصور
+│   │   ├── i18n.js           # نظام التدويل والترجمة التلقائية
+│   │   └── util.js           # دوال مساعدة، ضغط Canvas، وحساب المستويات
+│   └── i18n/                 # ملفات الترجمة الثمانية (405 مفتاح ترجمة لكل لغة)
+│       ├── ar.json / en.json / de.json / fr.json
+│       └── es.json / tr.json / fa.json / ur.json
+├── src-tauri/                # نواة تطبيق سطح المكتب (Rust + Tauri 2)
+│   ├── src/
+│   │   ├── main.rs           # نقطة الانطلاق
+│   │   └── lib.rs            # دوال Rust: حفظ الصور، الاتصال بـ Gemini، و Edge TTS
+│   ├── Cargo.toml            # حزم وتكوينات Rust
+│   └── tauri.conf.json       # إعدادات النوافذ والحزم والأذونات
 └── package.json
 ```
 
 ---
 
-## 1) Prerequisites Installation (One-time only)
+## 🗺️ خارطة الطريق (Roadmap)
 
-### Windows
-1. **Microsoft Edge WebView2** — Pre-installed in Windows 11 and updated Windows 10.
-2. **Rust**: Download `rustup-init.exe` from https://rustup.rs and run it.
-3. **Node.js 20+**: From https://nodejs.org (LTS version).
-4. **Visual Studio Build Tools**: From https://visualstudio.microsoft.com/visual-cpp-build-tools/
-   - During installation choose: **Desktop development with C++**.
-
-### Linux (Ubuntu / Debian)
-```bash
-sudo apt update
-sudo apt install -y build-essential curl wget file libx11-dev libasound2-dev \
-  libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-
-# Rust
-curl --proto '=https' --tlsv1.2 -sSf [https://sh.rustup.rs](https://sh.rustup.rs) | sh
-source "$HOME/.cargo/env"
-
-# Node.js (if not installed)
-curl -fsSL [https://deb.nodesource.com/setup_20.x](https://deb.nodesource.com/setup_20.x) | sudo -E bash -
-sudo apt install -y nodejs
-```
-
-Verify everything is ready:
-```bash
-rustc --version && node --version && npm --version
-```
+| المنصة | الحالة | ملاحظات |
+|---|---|---|
+| 🪟 Windows | ✅ متوفر (msi / nsis) | عبر صفحة الإصدارات في GitHub |
+| 🐧 Linux | ✅ متوفر (deb / rpm / AppImage) | عبر صفحة الإصدارات في GitHub |
+| 🤖 Android | 🔜 **قريباً بإذن الله** | Tauri 2 يدعم أندرويد رسمياً — النسخة قيد التحضير كتحديث مستقبلي |
+| 🍎 iOS / macOS | ⏳ غير مجدول حالياً | يتطلب بناءً حصرياً على جهاز Mac |
 
 ---
 
-## 2) First Run (Development Mode)
+## 📄 الترخيص (License)
 
-From inside the project folder:
-
-```bash
-npm install        # Installs Tauri CLI tools (first time only)
-npm run dev        # Builds the core and opens the app window
-```
-
-> First run takes several minutes (Rust compilation), subsequent runs are fast.
-> Upon success, the **Flashki** window will open with initial data ready for testing.
-
-### Testing the Frontend in Browser Only (Without Rust — For Quick Testing)
-```bash
-npm run web
-# Then open http://localhost:5173
-```
-In browser mode, everything works except that Gemini connection happens directly from the browser instead of the core (useful for testing the interface).
-
----
-
-## 3) Enabling AI (Gemini)
-
-1. Open https://aistudio.google.com/apikey and sign in with a Google account.
-2. Click **Create API key** and copy the key (starts with `AIza...`).
-3. In the app: **Settings ← AI Integration ← Gemini API Key** and paste the key then **Save**.
-   - The key is saved **locally on your device only** and is not exported with backups.
-4. Try: **Add Cards ← With AI** → Paste any study text → Choose number of cards → **Generate Cards** → Review generated cards → Save selected to your section.
-
-The model can be changed from the settings file, default is `gemini-2.5-flash`.
-
----
-
-## 4) Building the Distribution Version (Installers)
-
-```bash
-npm run build
-```
-
-Outputs:
-- **Windows**: `src-tauri/target/release/bundle/msi/*.msi` and `bundle/nsis/*-setup.exe`
-- **Linux**: `bundle/deb/*.deb` and `bundle/appimage/*.AppImage`
-
-These files are what you distribute to users — no server needed, every user installs the app and runs it locally on their device.
-
-### Changing the App Icon in the Future
-Place a square 1024x1024 PNG image then:
-```bash
-npm run icon
-```
-
----
-
-## 5) Android Step (Later when desktop version is ready)
-
-```bash
-rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
-# Requires installing Android Studio + Android SDK then:
-npm run tauri android init
-npm run tauri android dev
-npm run tauri android build   # Produces .apk / .aab for the store
-```
-
----
-
-## Currently Implemented (First Round)
-
-- All original design screens are connected to real logic: Home, Sections, Browse, Highlight Search, Real Statistics (Bar chart + Heatmap + Learning streaks), Add, Settings.
-- **Data**: Local IndexedDB — sections, cards, review logs, and settings + initial data (4 sections, 20 cards) for first run.
-- **Review Session**: Building a queue of due + new cards (with daily limit), sorting (shuffle/sequential/hardest first), direction (normal/reverse), 4-tier rating updating SM-2 scheduling immediately, keyboard shortcuts (Space to flip, 1-4 to rate, Esc to exit), session end screen with real statistics.
-- **AI**: Text → Cards via Gemini (from Rust core) with two-sided option and contextual examples — **PDF feature has been removed as requested**.
-- **Audio**: Real microphone recording for both sides and playback during review, and automatic or manual TTS pronunciation (Arabic/English).
-- **Data**: Full JSON backup export/import (with audio recordings), and a master reset button.
-
-## Common Issues and Solutions
-
-| Issue | Solution |
-|---|---|
-| `error: Microsoft Visual C++ 14.0 or greater is required` (Windows) | Install Visual Studio Build Tools with "Desktop development with C++" workload |
-| `failed to run custom build command` or missing `webkit2gtk` (Linux) | Install libwebkit2gtk-4.1-dev and libgtk-3-dev packages from the section above |
-| `cargo: command not found` | Reopen terminal after installing rustup or run `source "$HOME/.cargo/env"` |
-| Font appears different on first run without internet | Fonts are loaded locally inside the project — make sure `src/assets/fonts` folder exists |
-| Gemini connection failed | Check the key in settings, internet connection, and quota usage in Google AI Studio |
-| Microphone not working (Windows) | Check microphone permission for Flashki app in privacy settings |
+هذا المشروع مرخص بموجب رخصة [MIT License](LICENSE).
+جميع الحقوق محفوظة للمطورين ومجتمع المصادر المفتوحة.

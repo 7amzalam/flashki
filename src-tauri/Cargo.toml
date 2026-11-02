@@ -1,6 +1,6 @@
 [package]
 name = "flashki"
-version = "1.0.0"
+version = "1.1.0"
 description = "Flashki — Smart flashcards with spaced repetition (fully local + Gemini AI)"
 authors = ["Flashki"]
 edition = "2021"

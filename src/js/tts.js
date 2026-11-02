@@ -243,19 +243,81 @@
   function escXml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;'); }
   function randHex(n) { var s = ''; for (var i = 0; i < n; i++) s += Math.floor(Math.random() * 16).toString(16); return s; }
 
-  function playBlob(blob) {
-    try {
-      if (edgeAudio) { try { edgeAudio.pause(); } catch (e) {} }
-      var url = URL.createObjectURL(blob);
-      edgeAudio = new Audio(url);
-      edgeAudio.onended = function () { URL.revokeObjectURL(url); };
-      var pr = edgeAudio.play();
-      if (pr && pr.catch) pr.catch(function () {});
-    } catch (e) { /* silent */ }
+  var statusCallback = null;
+  function notify(ev) {
+    if (typeof statusCallback === 'function') {
+      try { statusCallback(ev); } catch (e) {}
+    }
   }
 
-  /* ═════════ fallback: Web Speech ═════════ */
+  function playBlob(blob) {
+    try {
+      if (edgeAudio) {
+        try {
+          edgeAudio.onended = null;
+          edgeAudio.onerror = null;
+          edgeAudio.pause();
+        } catch (e) {}
+      }
+      var url = URL.createObjectURL(blob);
+      edgeAudio = new Audio(url);
+      edgeAudio.onended = function () {
+        URL.revokeObjectURL(url);
+        notify('end');
+      };
+      edgeAudio.onerror = function () {
+        URL.revokeObjectURL(url);
+        notify('error');
+      };
+      var pr = edgeAudio.play();
+      if (pr && pr.then) {
+        pr.then(function () {
+          notify('play');
+        }).catch(function () {
+          notify('error');
+        });
+      } else {
+        notify('play');
+      }
+    } catch (e) { notify('error'); }
+  }
+
+  /* ═════════ fallback: Web Speech + Google TTS ═════════ */
   function webSpeechSupported() { return 'speechSynthesis' in window; }
+
+  /* حالة Web Speech تُتتبَّع محلياً — speechSynthesis.speaking يعلق true في WebKitGTK
+     بعد cancel()/النهاية بلا أصوات نظام، ما كان يحجب إعادة الاستماع إلى الأبد */
+  var webActive = false;
+
+  function speakGoogleTts(text, langCode) {
+    return new Promise(function (resolve, reject) {
+      try {
+        var clean = String(text || '').slice(0, 190).trim();
+        if (!clean) return reject(new Error('empty'));
+        var url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=' + encodeURIComponent(langCode) + '&client=tw-ob&q=' + encodeURIComponent(clean);
+        if (edgeAudio) {
+          try {
+            edgeAudio.onended = null;
+            edgeAudio.onerror = null;
+            edgeAudio.pause();
+          } catch (e) {}
+        }
+        edgeAudio = new Audio(url);
+        edgeAudio.onended = function () { notify('end'); resolve(); };
+        edgeAudio.onerror = function () { notify('error'); reject(new Error('audio err')); };
+        var pr = edgeAudio.play();
+        if (pr && pr.then) {
+          pr.then(function () {
+            notify('play');
+          }).catch(function (e) {
+            notify('error'); reject(e);
+          });
+        } else {
+          notify('play');
+        }
+      } catch (e) { notify('error'); reject(e); }
+    });
+  }
 
   function webSpeak(text, langCode) {
     try {
@@ -267,25 +329,48 @@
       var pref = voices.filter(function (v) { return v.lang.toLowerCase().indexOf(langCode) === 0; });
       if (pref[0]) u.voice = pref[0];
       u.rate = Number(App.state.settings && App.state.settings.ttsRate) || 1;
+      u.onstart = function () { webActive = true; notify('play'); };
+      u.onend = function () { webActive = false; notify('end'); };
+      u.onerror = function () { webActive = false; notify('error'); };
       window.speechSynthesis.speak(u);
-    } catch (e) { /* silent */ }
+    } catch (e) { notify('error'); }
+  }
+
+  function fallbackSpeak(text, langCode) {
+    if (String(text || '').length > 180) {
+      webSpeak(text, langCode);
+    } else {
+      speakGoogleTts(text, langCode).catch(function () {
+        webSpeak(text, langCode);
+      });
+    }
   }
 
   /* ═════════ الواجهة العامة ═════════ */
-  function speak(text, side) {
+  /* onBlob (اختياري): يستلم الـ MP3 بعد التوليد — يُستخدم لكاش صوت القصة لإعادة الاستماع الفوري */
+  function speak(text, side, onStatus, onBlob) {
     if (!text) return;
+    cancel();
+    statusCallback = onStatus || null;
+    notify('loading');
     var lang = resolveLang(text, side || 'front');
     var voice = voiceFor(lang);
     App.tts.lastCall = { text: String(text).slice(0, 60), side: side || 'front', lang: lang, voice: voice, ts: Date.now() }; /* تشخيص */
-    /* في Tauri: أمر Rust edge_tts_synthesize (لا قيود Origin). في المتصفح: WebSocket مباشر ثم fallback */
+    function deliver(blob) {
+      if (blob && typeof onBlob === 'function') { try { onBlob(blob); } catch (e) {} }
+      playBlob(blob);
+    }
+    /* في Tauri: أمر Rust edge_tts_synthesize (لا قيود Origin). في المتصفح: fallback فوري */
     if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
       window.__TAURI__.core.invoke('edge_tts_synthesize', { text: String(text), voice: voice, rate: ratePct() })
-        .then(function (b64) { if (b64) playBlob(b64ToBlob(b64)); else webSpeak(text, lang); })
-        .catch(function () { webSpeak(text, lang); });
+        .then(function (b64) {
+          var blob = b64 ? b64ToBlob(b64) : null;
+          if (blob) deliver(blob); else fallbackSpeak(text, lang);
+        })
+        .catch(function () { fallbackSpeak(text, lang); });
       return;
     }
-    cancel();
-    edgeSpeak(text, voice).then(playBlob).catch(function () { webSpeak(text, lang); });
+    edgeSpeak(text, voice).then(deliver).catch(function () { fallbackSpeak(text, lang); });
   }
 
   function b64ToBlob(b64) {
@@ -298,8 +383,31 @@
   }
 
   function cancel() {
-    if (edgeAudio) { try { edgeAudio.pause(); } catch (e) {} }
-    if (webSpeechSupported()) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+    statusCallback = null;
+    webActive = false;
+    if (edgeAudio) {
+      try {
+        edgeAudio.onended = null;
+        edgeAudio.onerror = null;
+        edgeAudio.pause();
+      } catch (e) {}
+    }
+    if (webSpeechSupported()) {
+      try { window.speechSynthesis.cancel(); } catch (e) {}
+    }
+  }
+
+  function isSpeaking() {
+    return !!(edgeAudio && !edgeAudio.paused && !edgeAudio.ended) || webActive;
+  }
+
+  /* تشغيل MP3 جاهز (من كاش القصة) — إعادة استماع فورية بلا طلب شبكي */
+  function playAudioBlob(blob, onStatus) {
+    if (!blob) return;
+    cancel();
+    statusCallback = onStatus || null;
+    notify('loading');
+    playBlob(blob);
   }
 
   /* يُستدعى من boot — لم تعد تملأ قائمة صوت واحد؛ توافقية مع الكود القديم */
@@ -309,6 +417,6 @@
   App.tts = {
     supported: supported, speak: speak, cancel: cancel, loadVoices: loadVoices,
     detectLang: detectLang, voiceFor: voiceFor, EDGE_VOICES: EDGE_VOICES,
-    edgeSpeak: edgeSpeak, _genGec: genGec
+    edgeSpeak: edgeSpeak, playAudioBlob: playAudioBlob, _genGec: genGec, isSpeaking: isSpeaking
   };
 })();

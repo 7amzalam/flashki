@@ -18,7 +18,7 @@
     searchFilter: 'all',
     searchQuery: '',
     chartRange: 30,
-    aiOptions: { count: 'auto', twosided: true, context: false },
+    aiOptions: { count: 'auto', twosided: false, context: true },
     aiMode: 'cards',
     lastStory: null,
     aiResults: [],
@@ -38,6 +38,11 @@
   /* ---------- view switching ---------- */
   App.switchView = function (view) {
     App.state.lastView = view;
+    try {
+      if (['study', 'session-end'].indexOf(view) < 0) {
+        localStorage.setItem('flashki_last_view', view);
+      }
+    } catch (e) {}
     U.qsa('.view').forEach(function (v) {
       if (v.getAttribute('data-view') === view) v.classList.add('active');
       else v.classList.remove('active');
@@ -51,6 +56,28 @@
     if (isStudy) app.classList.add('studying');
     else app.classList.remove('studying');
     App.i18n.updateTitle(view);
+
+    var quickAddBtn = U.getEl('quickAddBtn');
+    if (quickAddBtn) {
+      if (view === 'stories') {
+        quickAddBtn.setAttribute('data-action', 'open-story-creator');
+        quickAddBtn.removeAttribute('data-view');
+        var lbl = quickAddBtn.querySelector('span');
+        if (lbl) {
+          lbl.setAttribute('data-i18n', 'newStoryBtn');
+          lbl.textContent = App.t('newStoryBtn');
+        }
+      } else {
+        quickAddBtn.setAttribute('data-view', 'add');
+        quickAddBtn.removeAttribute('data-action');
+        var lbl2 = quickAddBtn.querySelector('span');
+        if (lbl2) {
+          lbl2.setAttribute('data-i18n', 'newCard');
+          lbl2.textContent = App.t('newCard');
+        }
+      }
+    }
+
     var content = U.getEl('content');
     if (content) content.scrollTop = 0;
 
@@ -61,6 +88,7 @@
     else if (view === 'browse') App.render.renderBrowse();
     else if (view === 'search') App.render.renderSearch();
     else if (view === 'add') App.render.renderDeckSelects();
+    else if (view === 'stories') App.render.renderStoriesView();
   };
 
   /* ---------- study session engine ---------- */
@@ -77,10 +105,30 @@
 
       App.store.getNewIntro().then(function (ni) {
         App.state.newIntro = ni;
-        var allowed = Math.max(0, (Number(App.state.settings.dailyNew) || 0) - (ni.count || 0));
-        fresh = fresh.slice(0, allowed);
+        var dailyNew = Number(App.state.settings.dailyNew) || 20;
+        var allowed = Math.max(0, dailyNew - (ni.count || 0));
+
+        if (allowed > 0) {
+          fresh = fresh.slice(0, allowed);
+        } else if (due.length === 0 && fresh.length > 0) {
+          /* لا بطاقات مستحقة ولكن توجد بطاقات جديدة أضافها المستخدم: نسمح له بدراستها فوراً */
+          fresh = fresh.slice(0, Math.min(fresh.length, dailyNew));
+        } else if (deckId !== 'all' && fresh.length > 0) {
+          /* فتح قسماً محدداً للدراسة: لا نغلق الباب في وجه البطاقات الجديدة غير المتعلمة */
+          fresh = fresh.slice(0, Math.min(fresh.length, dailyNew));
+        } else {
+          fresh = [];
+        }
+
         var queue = U.shuffle(due).concat(U.shuffle(fresh));
-        if (!queue.length) { U.toast(App.t('noDue')); return; }
+        if (!queue.length) {
+          if (pool.length > 0) {
+            U.toast(App.t('allReviewedForNow') || 'لقد راجعت جميع بطاقات هذا القسم حالياً — أحسنت!', 'info');
+          } else {
+            U.toast(App.t('noDue'));
+          }
+          return;
+        }
 
         /* ترتيب CEFR: الأقرب لمستوى المتعلم أولاً (ضمن المستحقة والجديدة معاً) */
         var userCefr = (App.state.profile && App.state.profile.cefrLevel) || (App.state.settings.cefrLevel) || 'B1';
@@ -109,23 +157,28 @@
       if (f.classList.contains('flipped')) {
         f.classList.remove('flipped');
         U.getEl('rateRow').classList.remove('show');
-        U.getEl('showAnswer').style.display = '';
         App.tts.cancel(); /* أوقف نطق الإجابة عند العودة للسؤال */
+        requestAnimationFrame(App.render.fitFrontWord);
         return;
       }
       f.classList.add('flipped');
       U.getEl('rateRow').classList.add('show');
-      U.getEl('showAnswer').style.display = 'none';
       var card = s.queue[s.idx];
-      if (App.state.settings.autoTts && App.tts.supported()) {
-        var back = s.dir === 'reverse' ? card.front : card.back;
-        if (back && back.length < 200) App.tts.speak(back, s.dir === 'reverse' ? 'front' : 'back');
+      if (App.state.settings.autoTts) {
+        var backVoice = s.dir === 'reverse' ? card.audioFront : card.audioBack;
+        if (backVoice) {
+          App.audio.playSource(backVoice);
+        } else if (App.tts.supported()) {
+          var back = s.dir === 'reverse' ? card.front : card.back;
+          if (back && back.length < 200) App.tts.speak(back, s.dir === 'reverse' ? 'front' : 'back');
+        }
       }
     },
 
     rate: function (rating) {
       var s = App.state.session;
       if (!s) return;
+      App.tts.cancel();
       var card = s.queue[s.idx];
       if (!card) return;
       var now = Date.now();
@@ -250,7 +303,21 @@
         App.render.renderAll();
         App.handlers.init();
         App.tts.loadVoices();
-        App.switchView('home');
+
+        /* استعادة القصة المحفوظة إن وجدت */
+        try {
+          var ls = localStorage.getItem('flashki_last_story');
+          if (ls) App.state.lastStory = JSON.parse(ls);
+        } catch (e) {}
+
+        /* استعادة الواجهة الأخيرة عند إعادة التحديث */
+        var savedView = 'home';
+        try {
+          var v = localStorage.getItem('flashki_last_view');
+          if (v && ['study', 'session-end'].indexOf(v) < 0) savedView = v;
+        } catch (e) {}
+        App.switchView(savedView);
+
         /* Onboarding أول مرة فقط */
         if (!App.state.profile.onboardingCompletedAt) {
           setTimeout(function () { App.handlers.openOnboarding(); }, 350);

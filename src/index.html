@@ -10,7 +10,7 @@
 (function(){try{var l=localStorage.getItem('flashki.ui');if(l){document.documentElement.lang=l;document.documentElement.dir=(l==='ur'||l==='fa')?'rtl':'ltr';if(l!=='ar'){document.documentElement.className+=' boot-wait';setTimeout(function(){document.documentElement.classList.remove('boot-wait');},3000);}}}catch(e){}})();
 </script>
 <link rel="stylesheet" href="css/fonts.css" />
-<link rel="stylesheet" href="css/styles.css?v=20" />
+<link rel="stylesheet" href="css/styles.css?v=21" />
 </head>
 <body class="dark">
 <script>
@@ -34,6 +34,7 @@
     <nav class="nav">
       <button class="nav-item active" data-view="home"><svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg><span data-i18n="navHome">الرئيسية</span></button>
       <button class="nav-item" data-view="decks"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg><span data-i18n="navReview">مراجعة</span><span class="nav-badge">24</span></button>
+      <button class="nav-item" data-view="stories"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span data-i18n="navStories">القصص</span></button>
       <button class="nav-item" data-view="browse"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span data-i18n="navBrowse">تصفح</span></button>
       <button class="nav-item" data-view="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><span data-i18n="navSearch">بحث</span></button>
       <button class="nav-item" data-view="stats"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span data-i18n="navStats">الإحصائيات</span></button>
@@ -41,6 +42,20 @@
       <button class="nav-item" data-view="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span data-i18n="navSettings">الإعدادات</span></button>
     </nav>
     <div class="sidebar-footer">
+      <a href="https://github.com/7amzalam/flashki" target="_blank" rel="noopener noreferrer" class="download-app-btn" id="downloadAppBtn" title="تحميل التطبيق — مستودع GitHub" data-i18n-title="downloadApp">
+        <div class="download-app-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </div>
+        <div class="download-app-text">
+          <div class="download-app-title" data-i18n="downloadApp">تحميل التطبيق</div>
+          <div class="download-app-sub" data-i18n="downloadAppSub">GitHub</div>
+        </div>
+        <svg class="download-app-ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      </a>
       <div class="streak-card"><div class="streak-flame">🔥</div><div><div class="streak-num" data-i18n="streakNum">7 أيام</div><div class="streak-label" data-i18n="streakLabel">سلسلة التعلم</div></div></div>
       <div class="profile"><div class="avatar">أ</div><div class="profile-text"><div class="profile-name">أحمد</div><div class="profile-sub" data-i18n="planFree">خطة مجانية</div></div><svg class="profile-more" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></div>
     </div>
@@ -48,11 +63,15 @@
 
   <main class="main">
     <header class="topbar">
-      <div class="topbar-title" id="pageTitle">بطاقاتي</div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" title="إخفاء / إظهار القائمة الجانبية للتركيز">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="topbar-title" id="pageTitle">بطاقاتي</div>
+      </div>
       <div class="topbar-actions">
         <div class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" data-i18n-placeholder="searchPh" placeholder="ابحث في بطاقاتك..." id="quickSearch" /></div>
-        <button class="btn-icon"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
-        <button class="btn-primary" data-view="add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="newCard">بطاقة جديدة</span></button>
+        <button class="btn-primary" id="quickAddBtn" data-view="add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="newCard">بطاقة جديدة</span></button>
       </div>
     </header>
 
@@ -82,6 +101,110 @@
         </div>
         <div class="section-header"><h2 data-i18n="allDecks">كل الأقسام</h2></div>
         <div class="picker-grid" id="deckPicker"></div>
+      </section>
+
+      <section class="view" data-view="stories">
+        <!-- صندوق إنشاء قصة جديدة (واسع ومريح) -->
+        <div class="stories-creator-card" id="viewStoriesCreator">
+          <div class="creator-card-header">
+            <div class="creator-card-title-group">
+              <div class="creator-card-title" data-i18n="storiesCreatorTitle">اكتب موضوعاً أو كلمات للقصة</div>
+              <div class="creator-card-sub" data-i18n="storiesCreatorSub">اختر موضوعاً أو الصق كلمات لتدور حولها قصة ممتعة تناسب مستواك التعليمي</div>
+            </div>
+            <span class="badge" id="storiesTargetLangBadge">الألمانية</span>
+          </div>
+
+          <div class="creator-input-wrap">
+            <textarea id="storiesPromptInput" class="stories-prompt-textarea" rows="4" data-i18n-placeholder="storiesPromptPh" placeholder="اكتب موضوعاً يدور في ذهنك (مثال: محادثة في مقهى ببرلين، رحلة بالقطار، مقابلة عمل، مواقف طارئة بالمطار...) أو الصق مفردات تريد تعلمها داخل سياق قصة ممتعة..."></textarea>
+          </div>
+
+          <div class="creator-card-footer">
+            <div class="creator-level-select-wrap">
+              <label for="storiesCefrSelect" data-i18n="storiesCefr">المستوى (CEFR):</label>
+              <select id="storiesCefrSelect" class="stories-select"></select>
+            </div>
+
+            <button type="button" class="btn-primary btn-generate-story" id="storiesDoGenerateBtn">
+              <svg viewBox="0 0 24 24" width="16" height="16"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span id="storiesGenBtnLabel" data-i18n="storiesGenBtn">توليد القصة بالذكاء الاصطناعي</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- عرض القصة الكاملة (شاشة قراءة فسيحة ونظيفة) -->
+        <div class="stories-reader-container" id="viewStoriesReader" style="display:none">
+          <!-- شريط التحكم والعنوان في سطر واحد منظم -->
+          <div class="stories-reader-toolbar">
+            <div class="stories-toolbar-start">
+              <h2 class="stories-reader-title" id="storiesViewTitle">…</h2>
+              <div class="stories-reader-meta-badge" id="storiesViewSub">…</div>
+            </div>
+
+            <div class="stories-toolbar-tools">
+              <!-- زر الترجمة الموازية بالجمل (تشغيل / إطفاء) -->
+              <button type="button" class="stories-tool-btn" id="storiesToggleInterlinearBtn" title="عرض ترجمة كل جملة تحتها مباشرة" data-i18n-title="interlinearToggle">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h14"/></svg>
+                <span id="interlinearBtnLabel" data-i18n="interlinearToggle">ترجمة بالجمل</span>
+              </button>
+
+              <!-- زر الاستماع الصوتي -->
+              <button type="button" class="stories-tool-btn tts-btn" id="storiesTtsBtn">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                <span id="storiesTtsBtnText" data-i18n="listen">استمع</span>
+              </button>
+
+              <!-- أزرار تكبير وتصغير الخط -->
+              <div class="stories-reader-font-box">
+                <button type="button" id="storiesFontDec" title="تصغير الخط" data-i18n-title="fontSizeMinus">A-</button>
+                <span id="storiesFontPercent">100%</span>
+                <button type="button" id="storiesFontInc" title="تكبير الخط" data-i18n-title="fontSizePlus">A+</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 1. منطقة القصة الرئيسية (القصة المستهدفة أو الترجمة بالجمل) -->
+          <div class="story-read-card" id="storiesTargetCard">
+            <div class="story-card-header">
+              <span class="story-card-badge" id="storiesTargetLangLabel">القصة (الألمانية)</span>
+            </div>
+            <div class="story-text-container" id="storiesViewText"></div>
+          </div>
+
+          <!-- 2. الترجمة العربية الكاملة (تختفي عند تفعيل الترجمة بالجمل لمنع التكرار) -->
+          <div class="story-read-card native-card" id="storiesNativeWrapper">
+            <div class="story-card-header">
+              <span class="story-card-badge native" id="storiesNativeLangLabel">الترجمة (العربية)</span>
+            </div>
+            <div class="story-text-container native" id="storiesViewTranslation"></div>
+          </div>
+
+          <!-- 3. مفردات القصة في شبكة بطاقات واضحة وغير متداخلة -->
+          <div class="story-read-card vocab-card" id="storiesVocabSection">
+            <div class="story-card-header">
+              <span class="story-card-badge vocab" data-i18n="storyVocab">مفردات من القصة</span>
+            </div>
+            <div class="story-vocab-grid" id="storiesViewVocab"></div>
+          </div>
+
+          <!-- الأزرار السفلية -->
+          <div class="stories-bottom-actions">
+            <button type="button" class="btn-primary" id="storiesExtractAllCardsBtn" style="margin-inline-start:auto;">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20"/></svg>
+              <span data-i18n="storyConvertAll">تحويل القصة بالكامل إلى بطاقات</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- حالة فارغة -->
+        <div class="empty-state" id="viewStoriesEmpty" style="display:none">
+          <div class="empty-icon">📖</div>
+          <div class="empty-title" data-i18n="storiesEmptyTitle">لا توجد قصة حالياً</div>
+          <div class="empty-sub" data-i18n="storiesEmptySub">اكتب موضوعاً أو كلمات لإنشاء قصة تفاعلية مخصصة لك</div>
+          <button type="button" class="btn-primary" id="storiesEmptyNewBtn" style="margin-top:16px;">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg>
+            <span data-i18n="storiesEmptyBtn">إنشاء أول قصة الآن</span>
+          </button>
+        </div>
       </section>
 
       <section class="view" data-view="browse">
@@ -120,38 +243,102 @@
           <header class="study-header">
             <button class="study-exit" id="exitStudy" aria-label="خروج" data-i18n-title="exit"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
             <div class="study-meta"><div class="study-deck"><span id="studyDeckName"></span> <span class="cefr-badge" id="studyCefr" style="display:none"></span></div><div class="study-sub" data-i18n="studySub">جلسة مراجعة</div></div>
-            <div class="study-counter"><b id="studyCurrent">1</b> / <span id="studyTotal">0</span></div>
             <span class="study-kbd-hint" data-i18n="studyKbdHint">Space = قلب · 1-4 = تقييم</span>
           </header>
-          <div class="study-progress"><div class="study-progress-bar" id="studyProgress"></div></div>
-          <div class="study-body">
-            <div class="flash-wrap">
-              <div class="flash" id="flashCard">
-                <div class="flash-face flash-front">
-                  <div class="flash-tag" data-i18n="qTag">سؤال</div>
-                  <button class="flash-tts" id="ttsBtn" title="نطق" data-i18n-title="speakTitle"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button>
-                  <img class="flash-image" id="flashImage" style="display:none" alt="" />
-                  <div class="flash-question" id="flashQuestion"></div>
-                  <div class="flash-hint"><svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg><span data-i18n="flipHint">اضغط على البطاقة لعرض الإجابة</span></div>
-                </div>
-                <div class="flash-face flash-back">
-                  <div class="flash-tag" data-i18n="aTag">الإجابة</div>
-                  <button class="flash-audio-badge" id="audioBadge"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg> <span data-i18n="yourRec">تسجيلك</span></button>
-                  <div class="flash-answer" id="flashAnswer"></div>
-                  <div class="flash-divider"></div>
-                  <div class="flash-example" id="flashExample" style="display:none"></div>
-                  <div class="flash-tip" id="flashTip" style="display:none"></div>
-                  <div class="flash-flipback-hint">↺ <span data-i18n="flipBackHint">اضغط على البطاقة للعودة إلى السؤال — قلب غير محدود</span></div>
-                </div>
+
+          <!-- شريط التقدم -->
+          <div class="fx-progress">
+            <div class="fx-progress-text"><span id="progressText">1 / 6</span></div>
+            <div class="fx-progress-track"><div id="progressBar" style="width:0%"></div></div>
+          </div>
+
+          <!-- البطاقة ثلاثية الأبعاد -->
+          <div class="fx-stage">
+            <div class="fx-perspective">
+              <div id="flashCard" class="fx-card-inner">
+
+                <!-- الوجه الأمامي: الكلمة بلغة التعلم -->
+                <section class="fx-face fx-front">
+                  <div class="fx-card-bg" id="flashCardBg" style="display:none"></div>
+                  <div class="card-glow" id="frontGlow"></div>
+                  <div class="fx-top-row">
+                    <div class="fx-badges">
+                      <span id="levelBadge" class="fx-badge lv-B" style="display:none">B1</span>
+                      <span id="typeBadge" class="fx-badge fx-badge-type" style="display:none"></span>
+                    </div>
+                    <button id="ttsBtn" type="button" class="fx-audio-btn" aria-label="نطق الكلمة" data-i18n-title="speakTitle">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 5 6 9H3v6h3l5 4V5Z" stroke-linejoin="round"/>
+                        <path d="M15.5 8.5a5 5 0 0 1 0 7" stroke-linecap="round"/>
+                        <path d="M18.5 5.5a9 9 0 0 1 0 13" stroke-linecap="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                  <img class="fx-image" id="flashImage" style="display:none" alt="" />
+                  <div id="wordArea" class="fx-word-area">
+                    <h2 id="wordH2" class="fx-word" dir="ltr">
+                      <span id="articleEl" class="fx-article" style="display:none"></span><span id="wordEl"></span>
+                    </h2>
+                  </div>
+                  <button id="flipBtn" type="button" class="fx-flip-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                      <path d="M3 12a9 9 0 0 1 15.3-6.4L21 8" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M21 3v5h-5" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M21 12a9 9 0 0 1-15.3 6.4L3 16" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M3 21v-5h5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span data-i18n="flipCardBtn">اقلب البطاقة</span>
+                  </button>
+                </section>
+
+                <!-- الوجه الخلفي: الترجمة بلغة المستخدم -->
+                <section class="fx-face fx-back">
+                  <div class="fx-back-scroll">
+                    <div class="fx-back-center">
+                      <div>
+                        <h2 id="translationEl" class="fx-translation"></h2>
+                      </div>
+                      <div class="fx-divider"></div>
+                      <div id="exampleBlock" class="fx-example-block" style="display:none">
+                        <div class="fx-example-row" dir="ltr">
+                          <button id="exampleAudioBtn" type="button" class="fx-example-audio" aria-label="نطق الجملة" data-i18n-title="speakTitle">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M11 5 6 9H3v6h3l5 4V5Z" stroke-linejoin="round"/>
+                              <path d="M15.5 8.5a5 5 0 0 1 0 7" stroke-linecap="round"/>
+                            </svg>
+                          </button>
+                          <p id="exampleEl" class="fx-example"></p>
+                        </div>
+                        <p id="exampleTranslation" class="fx-example-tr"></p>
+                      </div>
+                    </div>
+                  </div>
+                  <footer class="fx-back-footer">
+                    <div id="fullWordEl" dir="ltr" class="fx-full-word"></div>
+                    <div id="repInfoEl" class="fx-rep-info">—</div>
+                  </footer>
+                </section>
+
               </div>
             </div>
-            <div class="rate-row" id="rateRow">
-              <button class="rate-btn" data-rate="again"><span class="rate-kbd">1</span><span class="rate-label" data-i18n="rAgain">صعب جداً</span><span class="rate-int" id="intAgain">—</span></button>
-              <button class="rate-btn" data-rate="hard"><span class="rate-kbd">2</span><span class="rate-label" data-i18n="rHard">صعب</span><span class="rate-int" id="intHard">—</span></button>
-              <button class="rate-btn" data-rate="good"><span class="rate-kbd">3</span><span class="rate-label" data-i18n="rGood">متوسط</span><span class="rate-int" id="intGood">—</span></button>
-              <button class="rate-btn" data-rate="easy"><span class="rate-kbd">4</span><span class="rate-label" data-i18n="rEasy">سهل</span><span class="rate-int" id="intEasy">—</span></button>
+          </div>
+
+          <!-- شريط التقييم (SRS) -->
+          <div id="rateRow" class="fx-srs-wrap">
+            <div class="fx-srs-bar">
+              <button type="button" class="srs-btn" data-rate="easy" style="--c1:#10b981; --c2:#059669;">
+                <span class="srs-key">1</span><span class="srs-label" data-i18n="rEasy">سهل</span><span class="srs-interval" id="intEasy">—</span>
+              </button>
+              <button type="button" class="srs-btn" data-rate="good" style="--c1:#3b82f6; --c2:#2563eb;">
+                <span class="srs-key">2</span><span class="srs-label" data-i18n="rGood">متوسط</span><span class="srs-interval" id="intGood">—</span>
+              </button>
+              <button type="button" class="srs-btn" data-rate="hard" style="--c1:#f97316; --c2:#ea580c;">
+                <span class="srs-key">3</span><span class="srs-label" data-i18n="rHard">صعب</span><span class="srs-interval" id="intHard">—</span>
+              </button>
+              <button type="button" class="srs-btn" data-rate="again" style="--c1:#ef4444; --c2:#dc2626;">
+                <span class="srs-key">4</span><span class="srs-label" data-i18n="rAgain">صعب جداً</span><span class="srs-interval" id="intAgain">—</span>
+              </button>
             </div>
-            <button class="show-answer-btn" id="showAnswer" data-i18n="showAnswer">عرض الإجابة</button>
           </div>
         </div>
       </section>
@@ -182,28 +369,11 @@
         <div class="add-panel" data-panel="manual">
           <div class="panel-grid">
             <div>
-              <div class="field"><div class="field-label-row"><label id="frontLabel">السؤال (الإنجليزية)</label><button class="tts-mini" data-tts="Question" title="نطق السؤال — كشف تلقائي للغة" data-i18n-title="ttsMiniQ"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button></div><textarea id="frontInput" data-i18n-placeholder="frontPh" placeholder="اكتب السؤال أو الكلمة..."></textarea></div>
-              <div class="field"><div class="field-label-row"><label id="backLabel">الإجابة (العربية)</label><div class="field-label-actions"><button class="tts-mini" data-tts="Answer" title="نطق الإجابة — كشف تلقائي للغة" data-i18n-title="ttsMiniA"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button><button class="translate-btn" id="translateBtn" title="ترجمة تلقائية إلى لغتك الأم" data-i18n-title="translateBtnTitle"><svg viewBox="0 0 24 24"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg><span data-i18n="translateBtn">ترجم</span></button></div></div><textarea id="backInput" data-i18n-placeholder="backPh" placeholder="اكتب الإجابة أو التعريف..."></textarea></div>
-              <div class="field"><div class="field-label-row"><label data-i18n="cardImage">صورة البطاقة (اختياري — تظهر أعلى الوجه الأمامي)</label></div>
-                <div class="card-image-row" id="cardImageRow">
-                  <button type="button" class="btn-ghost btn-sm" id="imageUploadBtn"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span data-i18n="uploadImage">رفع صورة</span></button>
-                  <input type="file" id="imageFileInput" accept="image/png,image/jpeg,image/webp" style="display:none" />
-                  <div class="card-image-preview" id="cardImagePreview" style="display:none">
-                    <img id="cardImageImg" alt="" />
-                    <button type="button" class="card-image-remove" id="cardImageRemove" title="إزالة الصورة" data-i18n-title="removeImage">×</button>
-                  </div>
-                </div>
-              </div>
-              <div class="field"><label data-i18n="lblVoiceFront">تسجيل صوتي للوجه الأمامي (اختياري)</label>
+              <div class="field"><div class="field-label-row"><label id="frontLabel">الوجه الأول (الإنجليزية)</label><button class="tts-mini" data-tts="Question" title="نطق الوجه الأول — كشف تلقائي للغة" data-i18n-title="ttsMiniQ"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button></div><textarea id="frontInput" data-i18n-placeholder="frontPh" placeholder="اكتب السؤال أو الكلمة..."></textarea></div>
+              <div class="field"><div class="field-label-row"><label id="backLabel">الوجه الثاني (العربية)</label><div class="field-label-actions"><button class="tts-mini" data-tts="Answer" title="نطق الوجه الثاني — كشف تلقائي للغة" data-i18n-title="ttsMiniA"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button><button class="translate-btn" id="translateBtn" title="ترجمة تلقائية إلى لغتك الأم" data-i18n-title="translateBtnTitle"><svg viewBox="0 0 24 24"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg><span data-i18n="translateBtn">ترجم</span></button></div></div><textarea id="backInput" data-i18n-placeholder="backPh" placeholder="اكتب الإجابة أو التعريف..."></textarea></div>
+              <div class="field"><div class="field-label-row"><label id="exampleLabel" data-i18n="exampleLabel">جملة توضيحية على الوجه الخلفي (اختياري)</label><button class="tts-mini" data-tts="Example" title="نطق المثال" data-i18n-title="ttsMiniEx"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button></div><input type="text" id="exampleInput" data-i18n-placeholder="examplePh" placeholder="اكتب جملة مثال توضح الكلمة..." style="margin-bottom:8px" /><input type="text" id="exampleTranslationInput" data-i18n-placeholder="exampleTranslationPh" placeholder="اكتب ترجمة جملة المثال..." /></div>
+              <div class="field"><label data-i18n="lblVoiceFront">تسجيل صوتي للبطاقة (اختياري)</label>
                 <div class="voice-recorder" data-recorder="front">
-                  <button class="rec-btn" data-rec><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></svg></button>
-                  <div class="rec-wave"><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div></div>
-                  <span class="rec-time">0:00</span>
-                  <div class="rec-actions"><button class="rec-action" title="تشغيل" data-i18n-title="play"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></button><button class="rec-action del" title="حذف" data-i18n-title="delete"><svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></div>
-                </div>
-              </div>
-              <div class="field"><label data-i18n="lblVoiceBack">تسجيل صوتي للوجه الخلفي (اختياري)</label>
-                <div class="voice-recorder" data-recorder="back">
                   <button class="rec-btn" data-rec><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></svg></button>
                   <div class="rec-wave"><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div><div class="rec-wave-bar"></div></div>
                   <span class="rec-time">0:00</span>
@@ -214,18 +384,18 @@
                 <div class="field"><label data-i18n="lblDeck">القسم</label><select id="deckSelect"></select></div>
                 <div class="field"><label data-i18n="lblTags">الوسوم</label><input type="text" id="tagsInput" data-i18n-placeholder="tagsPh" placeholder="مفردات، قواعد..." /></div>
               </div>
-              <label class="checkbox-row" id="twoSidedRow">
-                <input type="checkbox" id="twoSidedCheck" checked />
-                <div class="checkbox-row-text"><div class="checkbox-row-title" data-i18n="twoSidedTitle">إنشاء بطاقة معاكسة تلقائياً</div><div class="checkbox-row-sub" data-i18n="twoSidedSub">ينشئ بطاقة ثانية بالسؤال والإجابة معكوسَين</div></div>
-              </label>
-              <details class="advanced-opts">
-                <summary data-i18n="advancedOpts">خيارات متقدمة</summary>
-                <div class="field-row">
-                  <div class="field"><label data-i18n="cardLang">لغة البطاقة</label><select id="cardLangSelect"></select></div>
-                  <div class="field"><label data-i18n="cardCefr">مستوى البطاقة (CEFR)</label><select id="cardCefrSelect"><option value="auto" data-i18n="cefrAuto">تلقائي</option><option>A1</option><option>A2</option><option>B1</option><option>B2</option><option>C1</option><option>C2</option></select></div>
+              <div class="field">
+                <label data-i18n="lblImage">صورة (اختياري)</label>
+                <div class="upload-zone" id="cardUploadZone">
+                  <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                  <span data-i18n="uploadHint">اسحب صورة هنا أو اضغط للرفع</span>
                 </div>
-              </details>
-              <div class="field"><label data-i18n="lblImage">صورة (اختياري)</label><div class="upload-zone"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg><span data-i18n="uploadHint">اسحب صورة هنا أو اضغط للرفع</span></div></div>
+                <input type="file" id="imageFileInput" accept="image/png,image/jpeg,image/webp" style="display:none" />
+                <div class="card-image-preview" id="cardImagePreview" style="display:none;margin-top:10px">
+                  <img id="cardImageImg" alt="" />
+                  <button type="button" class="card-image-remove" id="cardImageRemove" title="إزالة الصورة" data-i18n-title="removeImage">×</button>
+                </div>
+              </div>
               <div class="form-actions"><button class="btn-ghost" id="previewCardBtn" data-i18n="preview">معاينة</button><button class="btn-ghost" id="cancelEditCardBtn" style="display:none" data-i18n="cancelEdit">إلغاء التعديل</button><button class="btn-primary" id="saveCardBtn"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span data-i18n="saveCard">حفظ البطاقة</span></button></div>
             </div>
             <div>
@@ -241,13 +411,16 @@
         </div>
 
         <div class="add-panel ai-panel" data-panel="ai" style="display:none">
-          <div class="ai-header"><div class="ai-badge" id="aiBadge"><span class="dot"></span> <span id="aiBadgeText">Gemini</span></div><span class="ai-hint" id="aiHint" data-i18n="aiHint">الصق نصاً طويلاً — سيحوّله الذكاء الاصطناعي إلى بطاقات</span></div>
-          <div class="ai-mode-seg" id="aiModeSeg" role="tablist">
-            <button type="button" class="ai-mode-opt on" data-ai-mode="cards"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20"/></svg><span data-i18n="modeCards">بطاقات</span></button>
-            <button type="button" class="ai-mode-opt" data-ai-mode="story"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span data-i18n="modeStory">قصة</span></button>
+          <div class="ai-header">
+            <div class="ai-badge" id="aiBadge"><span class="dot"></span> <span id="aiBadgeText">Gemini</span></div>
+            <div class="ai-lang-select-wrap">
+              <label for="aiTargetLangSelect" data-i18n="targetLang">اللغة التي تتعلمها</label>:
+              <select id="aiTargetLangSelect" class="select-style-sm"></select>
+            </div>
+            <span class="ai-hint" id="aiHint" data-i18n="aiHint">الصق نصاً طويلاً — سيحوّله الذكاء الاصطناعي إلى بطاقات</span>
           </div>
           <div class="ai-input"><textarea id="aiText" data-i18n-placeholder="aiPh" placeholder="الصق النص هنا..."></textarea><div class="ai-input-footer"><div class="ai-input-actions"></div><span class="ai-char-count" id="aiCharCount">0 / 10,000</span></div></div>
-          <div class="ai-options" id="aiOptions"><div class="ai-count-seg" id="aiCountSeg"><button type="button" class="ai-count-opt" data-count="5" data-i18n="cnt5">5 بطاقات</button><button type="button" class="ai-count-opt" data-count="10" data-i18n="cnt10">10 بطاقات</button><button type="button" class="ai-count-opt on" data-count="auto" data-i18n="cntAuto">تلقائي</button></div><div class="ai-option on" data-opt="twosided"><span class="ai-check"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span> <span data-i18n="aiOptTwoSided">بطاقة الوجهين</span></div><div class="ai-option" data-opt="context"><span class="ai-check"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span> <span data-i18n="aiOptContext">أمثلة سياقية</span></div></div>
+          <div class="ai-options" id="aiOptions"><div class="ai-count-seg" id="aiCountSeg"><button type="button" class="ai-count-opt" data-count="5" data-i18n="cnt5">5 بطاقات</button><button type="button" class="ai-count-opt" data-count="10" data-i18n="cnt10">10 بطاقات</button><button type="button" class="ai-count-opt on" data-count="auto" data-i18n="cntAuto">تلقائي</button></div><div class="ai-option on" data-opt="context"><span class="ai-check"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span> <span data-i18n="aiOptContext">أمثلة سياقية</span></div></div>
           <div class="ai-footer"><div class="ai-cost" id="aiCost"></div><button class="btn-ai" id="generateBtn"><svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3"/></svg> <span id="generateBtnLabel" data-i18n="generateCards">توليد البطاقات</span></button></div>
         </div>
       </section>
@@ -259,7 +432,7 @@
           <div class="settings-row"><div><div class="settings-row-label" data-i18n="ttsEngineRow">محرك النطق</div><div class="settings-row-sub" data-i18n="ttsEngineSub">Microsoft Edge TTS — مجاني وعالي الجودة، مع fallback محلي</div></div><select class="select-style" disabled><option>Microsoft Edge TTS</option></select></div>
           <div class="settings-row"><div><div class="settings-row-label" data-i18n="voiceTarget">صوت لغة الهدف</div></div><select class="select-style" id="voiceTargetSelect"></select></div>
           <div class="settings-row"><div><div class="settings-row-label" data-i18n="voiceNative">صوت اللغة الأم</div></div><select class="select-style" id="voiceNativeSelect"></select></div>
-          <div class="settings-row"><div><div class="settings-row-label" data-i18n="ttsSpeed">سرعة النطق</div></div><div class="range-wrap"><input type="range" min="0.5" max="2" step="0.1" value="1" oninput="this.nextElementSibling.textContent=this.value+'x'" /><span class="range-value">1x</span></div></div>
+          <div class="settings-row"><div><div class="settings-row-label" data-i18n="ttsSpeed">سرعة النطق</div><div class="settings-row-sub" data-i18n="ttsSpeedSub">تؤثر على نطق لغة التعلم: البطاقات والقصص والجُمل</div></div><div class="range-wrap"><input type="range" min="0.5" max="2" step="0.1" value="1" id="ttsRate" oninput="this.nextElementSibling.textContent=this.value+'x'" /><span class="range-value">1x</span></div></div>
           <div class="settings-row"><div><div class="settings-row-label" data-i18n="ttsAuto">نطق تلقائي عند القلب</div></div><div class="toggle on" id="autoTtsToggle"></div></div>
         </div>
 
@@ -311,10 +484,34 @@
   <nav class="bottom-nav">
     <button class="bottom-nav-item active" data-view="home"><svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></svg><span data-i18n="navHome">الرئيسية</span></button>
     <button class="bottom-nav-item" data-view="decks"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg><span data-i18n="navReview">مراجعة</span><span class="nav-badge">24</span></button>
+    <button class="bottom-nav-item" data-view="stories"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span data-i18n="navStories">القصص</span></button>
     <button class="bottom-nav-item" data-view="stats"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span data-i18n="navStats">إحصائيات</span></button>
     <button class="bottom-nav-item" data-view="add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="navAdd">إضافة</span></button>
     <button class="bottom-nav-item" data-view="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span data-i18n="navSettings">إعدادات</span></button>
   </nav>
+
+  <!-- نافذة تعديل كلمات القسم -->
+  <div class="modal-overlay" id="deckCardsModal">
+    <div class="modal wide deck-cards-modal">
+      <div class="modal-header">
+        <div class="deck-cards-modal-head-info">
+          <div class="modal-title" id="deckCardsModalTitle" data-i18n="deckWordsTitle">تعديل كلمات القسم</div>
+          <div class="modal-sub" id="deckCardsModalSub" data-i18n="deckWordsSub">عرض وتعديل المفردات والجمل والصور</div>
+        </div>
+        <button type="button" class="btn-primary btn-sm" id="deckCardsAddBtn">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          <span data-i18n="deckWordsAddBtn">إضافة كلمة جديدة</span>
+        </button>
+      </div>
+      <div class="deck-cards-toolbar">
+        <input type="text" id="deckCardsSearchInput" class="deck-cards-search" data-i18n-placeholder="deckWordsSearchPh" placeholder="ابحث في كلمات وجمل هذا القسم..." />
+      </div>
+      <div class="deck-cards-list" id="deckCardsList"></div>
+      <div class="modal-actions">
+        <button class="btn-ghost" data-close-modal data-i18n="close">إغلاق</button>
+      </div>
+    </div>
+  </div>
 
   <div class="modal-overlay" id="editDeckModal">
     <div class="modal">
@@ -347,17 +544,37 @@
 
     <div class="modal-overlay" id="storyResultModal">
     <div class="modal wide story-modal">
-      <div class="modal-header"><div class="modal-title" id="storyTitleText">…</div><div class="modal-sub" id="storySub"></div></div>
+      <div class="modal-header">
+        <div class="story-header-main">
+          <div class="modal-title" id="storyTitleText">…</div>
+          <div class="modal-sub" id="storySub"></div>
+        </div>
+        <div class="story-font-ctrls">
+          <button type="button" class="story-font-btn" id="storyFontDec" title="تصغير الخط">A-</button>
+          <span class="story-font-val" id="storyFontVal">100%</span>
+          <button type="button" class="story-font-btn" id="storyFontInc" title="تكبير الخط">A+</button>
+        </div>
+      </div>
       <div class="story-body">
-        <div class="story-block">
-          <div class="story-block-head"><span class="story-label" id="storyTargetLabel">القصة</span><button type="button" class="story-tts-btn" id="storyTtsBtn" data-i18n-title="listen" title="استمع"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg><span data-i18n="listen">استمع</span></button></div>
-          <div class="story-text" id="storyText"></div>
+        <div class="story-grid">
+          <div class="story-block target">
+            <div class="story-block-head">
+              <span class="story-label" id="storyTargetLabel">القصة</span>
+              <button type="button" class="story-tts-btn" id="storyTtsBtn" data-i18n-title="listen" title="استمع">
+                <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+                <span id="storyTtsBtnText" data-i18n="listen">استمع</span>
+              </button>
+            </div>
+            <div class="story-text" id="storyText"></div>
+          </div>
+          <div class="story-side-col">
+            <div class="story-block native">
+              <div class="story-block-head"><span class="story-label" id="storyNativeLabel">الترجمة</span></div>
+              <div class="story-text native" id="storyTranslation"></div>
+            </div>
+            <div class="story-vocab-wrap" id="storyVocabWrap"><div class="story-label" data-i18n="storyVocab">مفردات من القصة</div><div class="story-vocab" id="storyVocab"></div></div>
+          </div>
         </div>
-        <div class="story-block native">
-          <div class="story-block-head"><span class="story-label" id="storyNativeLabel">الترجمة</span></div>
-          <div class="story-text native" id="storyTranslation"></div>
-        </div>
-        <div class="story-vocab-wrap" id="storyVocabWrap"><div class="story-label" data-i18n="storyVocab">مفردات من القصة</div><div class="story-vocab" id="storyVocab"></div></div>
       </div>
       <div class="modal-actions">
         <button class="btn-ghost" data-close-modal data-i18n="close">إغلاق</button>
@@ -443,6 +660,9 @@
     </div>
   </div>
 
+  <!-- نافذة الكلمة التفاعلية في القصة -->
+  <div id="storyWordPopover" class="story-word-popover" style="display:none"></div>
+
   <div id="toast"></div>
   <input type="file" id="importFile" accept=".json,application/json" style="display:none" />
 
@@ -450,16 +670,16 @@
 
 
 <script src="vendor/sql-wasm.js"></script>
-<script src="js/util.js?v=19"></script>
-<script src="js/i18n.js?v=19"></script>
-<script src="js/db.js?v=19"></script>
-<script src="js/srs.js?v=19"></script>
-<script src="js/store.js?v=19"></script>
-<script src="js/tts.js?v=19"></script>
-<script src="js/audio.js?v=19"></script>
-<script src="js/ai.js?v=19"></script>
-<script src="js/render.js?v=19"></script>
-<script src="js/handlers.js?v=19"></script>
-<script src="js/app.js?v=19"></script>
+<script src="js/util.js?v=20"></script>
+<script src="js/i18n.js?v=20"></script>
+<script src="js/db.js?v=20"></script>
+<script src="js/srs.js?v=20"></script>
+<script src="js/store.js?v=20"></script>
+<script src="js/tts.js?v=20"></script>
+<script src="js/audio.js?v=20"></script>
+<script src="js/ai.js?v=20"></script>
+<script src="js/render.js?v=20"></script>
+<script src="js/handlers.js?v=20"></script>
+<script src="js/app.js?v=20"></script>
 </body>
 </html>

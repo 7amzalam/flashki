@@ -155,18 +155,27 @@
     App.state.decks.forEach(function (d) {
       var total = cardsOf(d.id).length;
       var due = dueCardsOf(d.id, now).length;
+      var fresh = newCardsOf(d.id).length;
+      var ready = due + fresh;
       var pct = deckLearnedPct(d.id);
       var acc = accuracyFromReviews(App.state.reviews.filter(function (r) { return r.deckId === d.id; }));
-      var dueColor = due > 0 ? 'color:' + (d.color || '#a78bfa') : 'color:#6ee7b7';
+      var dueColor = ready > 0 ? 'color:' + (d.color || '#a78bfa') : 'color:#6ee7b7';
       html += '<article class="picker-card" style="--accent:' + (d.color || '#8b5cf6') + '" data-deck="' + d.id + '" data-open-session>' +
         '<div class="picker-head"><div><div class="picker-title">' + (d.icon ? d.icon + ' ' : '') + U.esc(d.name) + '</div><div class="picker-sub">' + U.esc(d.desc || '') + '</div></div>' +
         '<div class="picker-head-actions"><button class="picker-edit-btn" data-action="edit-deck" data-id="' + d.id + '" title="' + App.t('editDeckTitle') + '"><svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>' +
         '<div class="deck-ring" style="--accent:' + (d.color || '#8b5cf6') + '">' + U.ringSvg(pct, d.color || '#8b5cf6') + '</div></div></div>' +
         '<div class="picker-stats">' +
         '<div class="picker-stat"><div class="picker-stat-val">' + U.fmtInt(total) + '</div><div class="picker-stat-lbl">' + App.t('cardUnit') + '</div></div>' +
-        '<div class="picker-stat"><div class="picker-stat-val" style="' + dueColor + '">' + U.fmtInt(due) + '</div><div class="picker-stat-lbl">' + App.t('dueCount') + '</div></div>' +
+        '<div class="picker-stat"><div class="picker-stat-val" style="' + dueColor + '">' + U.fmtInt(ready) + '</div><div class="picker-stat-lbl">' + App.t('dueCount') + '</div></div>' +
         '<div class="picker-stat"><div class="picker-stat-val">' + (acc == null ? '—' : acc + '%') + '</div><div class="picker-stat-lbl">' + App.t('accuracy') + '</div></div>' +
-        '</div></article>';
+        '</div>' +
+        '<div class="picker-footer">' +
+        '<button type="button" class="picker-manage-btn" data-action="manage-deck-cards" data-id="' + d.id + '" title="' + App.t('deckWordsTitle') + '">' +
+        '<svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+        '<span>' + App.t('editDeckWords') + ' (' + U.fmtInt(total) + ')</span>' +
+        '</button>' +
+        '</div>' +
+        '</article>';
     });
     html += '<button class="picker-card picker-new" data-action="new-deck"><div class="picker-new-icon"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div><div>' + App.t('newDeck') + '</div><div style="font-size:11.5px;color:var(--text-3);font-weight:400">' + App.t('newDeckBtnSub') + '</div></button>';
     U.getEl('deckPicker').innerHTML = html;
@@ -382,7 +391,16 @@
     U.getEl('heatmap').innerHTML = html;
   }
 
-  /* ---------- STUDY CARD ---------- */
+  /* ---------- STUDY CARD (تصميم v21 الزجاجي ثلاثي الأبعاد) ---------- */
+  /* ألوان أدوات التعريف الألمانية — من التصميم الجديد؛ للغات الأخرى لون محايد */
+  var FX_COLORS = {
+    der: { text: '#2563eb', soft: '#bfdbfe', glow: 'rgba(37,99,235,.20)' },
+    die: { text: '#db2777', soft: '#fbcfe8', glow: 'rgba(219,39,119,.18)' },
+    das: { text: '#059669', soft: '#a7f3d0', glow: 'rgba(5,150,105,.18)' }
+  };
+  var FX_NEUTRAL = { text: '#a78bfa', soft: 'rgba(139,92,246,.45)', glow: 'rgba(139,92,246,.22)' };
+  var AR_RE = /[\u0600-\u06FF]/;
+
   function intervalLabel(days, minutes) {
     if (minutes) return minutes + ' ' + App.t('minutesShort');
     if (days === 1) return '1 ' + App.t('day');
@@ -391,22 +409,93 @@
     return Math.round(days / 365) + ' ' + App.t('year');
   }
 
+  /* تمييز الكلمة داخل الجملة بلونها (من التصميم الجديد) — على نص مُهرَّب */
+  function highlightExample(sentence, word, color) {
+    var safe = U.esc(sentence);
+    if (!word) return safe;
+    var w = U.esc(word);
+    var idx = safe.toLowerCase().indexOf(w.toLowerCase());
+    if (idx === -1) return safe;
+    return safe.slice(0, idx) +
+      '<span style="color:' + color + '; font-weight:900;">' + safe.slice(idx, idx + w.length) + '</span>' +
+      safe.slice(idx + w.length);
+  }
+
+  /* ملاءمة حجم الكلمة الأمامية تلقائياً مع مساحة البطاقة (من التصميم الجديد) */
+  function fitFrontWord() {
+    var wordArea = U.getEl('wordArea'), wordH2 = U.getEl('wordH2');
+    if (!wordArea || !wordH2) return;
+    wordH2.style.fontSize = '';
+    var maxH = wordArea.clientHeight;
+    var maxW = wordArea.clientWidth;
+    if (!maxH || !maxW) return;
+    var fontSize = parseFloat(getComputedStyle(wordH2).fontSize) || 48;
+    var guard = 0;
+    var MIN_SIZE = 14;
+    while ((wordH2.scrollHeight > maxH + 1 || wordH2.scrollWidth > maxW + 1) && fontSize > MIN_SIZE && guard < 180) {
+      fontSize -= 1;
+      wordH2.style.fontSize = fontSize + 'px';
+      guard++;
+    }
+  }
+
   function renderStudyCard() {
     var s = App.state.session;
     if (!s || !s.queue.length) return;
+
+    /* إرجاع البطاقة فوراً للوجه الأمامي بدون أنيميشن لمنع رؤية إجابة البطاقة التالية */
+    var f = U.getEl('flashCard');
+    if (f) {
+      f.style.transition = 'none';
+      f.classList.remove('flipped');
+      void f.offsetHeight; /* فرض تطبيق التغيير فوراً */
+      f.style.transition = '';
+    }
+    var rateRow = U.getEl('rateRow');
+    if (rateRow) rateRow.classList.remove('show');
+    App.tts.cancel();
+
     var card = s.queue[s.idx];
     var front = s.dir === 'reverse' ? card.back : card.front;
     var back = s.dir === 'reverse' ? card.front : card.back;
-    var q = U.getEl('flashQuestion');
-    if (s.dir === 'reverse') {
-      q.innerHTML = U.esc(front);
-    } else if (front.length <= 60) {
-      var pre = App.t('qWrapPre'), post = App.t('qWrapPost');
-      q.innerHTML = pre + '<br><b>' + U.esc(front) + '</b>' + (post ? ' ' + post : '');
+
+    /* التقدم — بنمط التصميم "1 / 6" */
+    U.getEl('progressText').textContent = U.fmtInt(s.idx + 1) + ' / ' + U.fmtInt(s.queue.length);
+    U.getEl('progressBar').style.width = ((s.idx + 1) / s.queue.length * 100) + '%';
+
+    /* الكلمة الأمامية (بلغة التعلم) + أداة التعريف الملونة إن وُجدت */
+    var articleEl = U.getEl('articleEl'), wordEl = U.getEl('wordEl'), wordH2 = U.getEl('wordH2');
+    var col = FX_NEUTRAL;
+    var m = /^(der|die|das)\s+(.+)$/i.exec((front || '').trim());
+    if (m) {
+      col = FX_COLORS[m[1].toLowerCase()] || FX_NEUTRAL;
+      articleEl.textContent = m[1];
+      articleEl.style.display = '';
+      articleEl.style.color = col.text;
+      wordEl.textContent = m[2];
     } else {
-      q.innerHTML = U.esc(front);
+      articleEl.style.display = 'none';
+      wordEl.textContent = front;
     }
-    U.getEl('flashAnswer').textContent = back;
+    wordH2.setAttribute('dir', AR_RE.test((front || '').charAt(0)) ? 'rtl' : 'ltr');
+    U.getEl('frontGlow').style.setProperty('--glow', col.glow);
+    var ttsBtnEl = U.getEl('ttsBtn');
+    ttsBtnEl.style.color = col.text;
+    ttsBtnEl.style.borderColor = col.soft;
+
+    /* الشارات: مستوى CEFR + أول وسم */
+    var lv = U.getEl('levelBadge');
+    if (card.cefr) {
+      var g = card.cefr.charAt(0).toUpperCase();
+      lv.className = 'fx-badge lv-' + (g === 'A' ? 'A' : (g === 'C' ? 'C' : 'B'));
+      lv.textContent = card.cefr;
+      lv.style.display = '';
+    } else lv.style.display = 'none';
+    var tp = U.getEl('typeBadge');
+    var tg = (card.tags || [])[0];
+    if (tg) { tp.textContent = tg; tp.style.display = ''; }
+    else tp.style.display = 'none';
+
     var deck = deckById(card.deckId);
     U.getEl('studyDeckName').textContent = deck ? deck.name : (s.deckLabel || '');
     var cefrEl = U.getEl('studyCefr');
@@ -414,66 +503,67 @@
       if (card.cefr) { cefrEl.textContent = card.cefr; cefrEl.style.display = ''; cefrEl.className = 'cefr-badge cefr-' + card.cefr; }
       else cefrEl.style.display = 'none';
     }
-    U.getEl('studyCurrent').textContent = U.fmtInt(s.idx + 1);
-    U.getEl('studyTotal').textContent = U.fmtInt(s.queue.length);
-    U.getEl('studyProgress').style.width = (s.idx / s.queue.length * 100) + '%';
 
-    var audio = U.getEl('audioBadge');
-    var hasAudio = !!(card.audioFront || card.audioBack);
-    audio.style.display = hasAudio ? '' : 'none';
-
-    /* صورة البطاقة (v20): أعلى الوجه الأمامي — عرض 60%، object-fit: contain */
-    var imgEl = U.getEl('flashImage');
-    if (imgEl) {
-      if (card.imagePath && s.dir !== 'reverse') {
-        var wantPath = card.imagePath;
-        imgEl.setAttribute('data-cur-path', wantPath);
-        imgEl.style.display = 'none'; /* يظهر عند جاهزية src */
-        App.handlers.imagePathToSrc(wantPath).then(function (src) {
-          if (src && imgEl.getAttribute('data-cur-path') === wantPath) {
-            imgEl.src = src;
-            imgEl.style.display = 'block'; /* CSS الافتراضي none — الإظهار صريح */
-          }
-        });
-      } else {
-        imgEl.style.display = 'none';
-        imgEl.src = '';
-        imgEl.setAttribute('data-cur-path', '');
-      }
-    }
-    var exEl = U.getEl('flashExample');
+    /* الوجه الخلفي (بلغة المستخدم): الترجمة + المثال + تذييل البطاقة */
+    U.getEl('translationEl').textContent = back;
+    var exBlock = U.getEl('exampleBlock');
     if (card.example) {
-      exEl.innerHTML = '<span class="flash-example-lbl">' + App.t('exampleWord') + '</span>' +
-        U.esc(card.example) + (card.exampleTranslation ? '<div class="flash-example-tr">' + U.esc(card.exampleTranslation) + '</div>' : '');
-      exEl.style.display = '';
-    } else exEl.style.display = 'none';
+      var exWord = m ? m[2] : (front.length <= 40 ? front : '');
+      U.getEl('exampleEl').innerHTML = highlightExample(card.example, exWord, col.text);
+      var exTr = U.getEl('exampleTranslation');
+      if (card.exampleTranslation) { exTr.textContent = card.exampleTranslation; exTr.style.display = ''; }
+      else exTr.style.display = 'none';
+      exBlock.style.display = '';
+    } else exBlock.style.display = 'none';
 
-    /* نصيحة البطاقات المولّدة بالذكاء الاصطناعي: نوع الكلمة + المستوى + تلميح حفظ */
-    var tipEl = U.getEl('flashTip');
-    if (tipEl) {
-      if (card.generatedFrom) {
-        var chips = '';
-        (card.tags || []).forEach(function (tg) {
-          if (tg) chips += '<span class="tip-chip">' + U.esc(tg) + '</span>';
-        });
-        if (card.cefr) chips += '<span class="tip-chip lv">' + U.esc(card.cefr) + '</span>';
-        chips += '<span class="tip-chip ai">✨ ' + App.t('aiMade') + '</span>';
-        tipEl.innerHTML = '<div class="tip-chips">' + chips + '</div><div class="tip-text">💡 ' + U.esc(App.t('cardTip')) + '</div>';
-        tipEl.style.display = '';
-      } else tipEl.style.display = 'none';
+    var fw = U.getEl('fullWordEl');
+    if (m) fw.innerHTML = '<span style="color:' + col.text + '">' + U.esc(m[1]) + '</span> <span>' + U.esc(m[2]) + '</span>';
+    else fw.textContent = front;
+
+    var st = card.srs;
+    var statusKey = st && st.status === 'new' ? 'newTag' : (st && st.status === 'learning' ? 'learningTag' : 'reviewTag');
+    U.getEl('repInfoEl').textContent = (st && st.reps)
+      ? App.tf('repInfo', { n: U.fmtInt(st.reps) }) + ' · ' + App.t(statusKey)
+      : App.t('newTag');
+
+    /* تسجيل صوتي للمستخدم على الوجه الخلفي */
+    var audio = U.getEl('audioBadge');
+    if (audio) audio.style.display = 'none';
+
+    /* صورة البطاقة: تظهر كخلفية للبطاقة مع تعتيم أنيق */
+    var bgEl = U.getEl('flashCardBg');
+    var fxFront = U.qs('.fx-front');
+    var imgEl = U.getEl('flashImage');
+    if (imgEl) { imgEl.style.display = 'none'; imgEl.src = ''; }
+
+    if (card.imagePath && s.dir !== 'reverse') {
+      var wantPath = card.imagePath;
+      if (bgEl) bgEl.setAttribute('data-cur-path', wantPath);
+      App.handlers.imagePathToSrc(wantPath).then(function (src) {
+        if (src && bgEl && bgEl.getAttribute('data-cur-path') === wantPath) {
+          bgEl.style.backgroundImage = 'url("' + src.replace(/"/g, '\\"') + '")';
+          bgEl.style.display = 'block';
+          if (fxFront) fxFront.classList.add('has-bg-image');
+        }
+      });
+    } else {
+      if (bgEl) {
+        bgEl.style.display = 'none';
+        bgEl.style.backgroundImage = '';
+        bgEl.setAttribute('data-cur-path', '');
+      }
+      if (fxFront) fxFront.classList.remove('has-bg-image');
     }
 
+    /* فترات التكرار المتوقعة على أزرار التقييم (منطق SM-2 كما هو) */
     var prev = App.srs.preview(card.srs || App.srs.newState(Date.now()));
     U.getEl('intAgain').textContent = intervalLabel(0, 10);
     U.getEl('intHard').textContent = intervalLabel(prev.hard.days, 0);
     U.getEl('intGood').textContent = intervalLabel(prev.good.days, 0);
     U.getEl('intEasy').textContent = intervalLabel(prev.easy.days, 0);
 
-    var f = U.getEl('flashCard');
-    f.classList.remove('flipped');
-    U.getEl('rateRow').classList.remove('show');
-    U.getEl('showAnswer').style.display = '';
     s.cardShownAt = Date.now();
+    requestAnimationFrame(fitFrontWord);
   }
 
   function renderSessionEnd(stats) {
@@ -483,8 +573,14 @@
   }
 
   /* ---------- FORMS / SELECTS ---------- */
-  function deckOptions(selectedId, includeAll) {
-    var html = includeAll ? '<option value="all">' + App.t('allDecks') + '</option>' : '';
+  function deckOptions(selectedId, includeAll, includeNew) {
+    var html = '';
+    if (includeNew) {
+      html += '<option value="__new__">➕ ' + (App.t('newDeck') || 'إنشاء قسم جديد...') + '</option>';
+    }
+    if (includeAll) {
+      html += '<option value="all">' + App.t('allDecks') + '</option>';
+    }
     App.state.decks.forEach(function (d) {
       html += '<option value="' + d.id + '"' + (selectedId === d.id ? ' selected' : '') + '>' + U.esc(d.name) + '</option>';
     });
@@ -493,20 +589,17 @@
 
   function renderDeckSelects() {
     var first = App.state.decks.length ? App.state.decks[0].id : '';
-    U.getEl('deckSelect').innerHTML = deckOptions(first, false);
+    var ds = U.getEl('deckSelect');
+    if (ds) {
+      var curVal = ds.value;
+      ds.innerHTML = deckOptions(curVal || first, false, true);
+      if (curVal && curVal !== '__new__') ds.value = curVal;
+      else if (first) ds.value = first;
+    }
     /* في نافذة حفظ بطاقات AI: الخيار الأول دائماً "قسم جديد بالعنوان المقترح" */
-    U.getEl('aiDeckSelect').innerHTML = '<option value="__new__">' + App.t('newDeckOpt') + '</option>' + deckOptions(first, false);
-    /* لغة البطاقة (خيارات متقدمة) — الافتراضي تلقائي */
-    var cl = U.getEl('cardLangSelect');
-    if (cl) {
-      var html = '<option value="auto">' + App.t('cardLangAuto') + '</option>';
-      Object.keys(U.LANGS).forEach(function (code) {
-        var L = U.LANGS[code];
-        html += '<option value="' + code + '">' + L.flag + ' ' + U.langName(code, App.state.lang) + '</option>';
-      });
-      var cur = cl.value || 'auto';
-      cl.innerHTML = html;
-      cl.value = cur;
+    var ads = U.getEl('aiDeckSelect');
+    if (ads) {
+      ads.innerHTML = '<option value="__new__">' + App.t('newDeckOpt') + '</option>' + deckOptions(first, false, false);
     }
   }
 
@@ -534,6 +627,8 @@
     var b = U.getEl('backLabel');
     if (f) f.textContent = App.tf('lblFrontLang', { lang: U.langName(p.targetLang, ui) });
     if (b) b.textContent = App.tf('lblBackLang', { lang: U.langName(p.nativeLang, ui) });
+    fillLangSelect(U.getEl('aiTargetLangSelect'), p.targetLang || 'de');
+    renderStoriesCefrSelect();
   }
 
   function renderSettings() {
@@ -570,8 +665,9 @@
     var ms = U.getEl('modelSelect');
     if (ms) {
       var models = App.ai.modelList();
+      var curModel = (s.model && !(App.ai.isDeadModel && App.ai.isDeadModel(s.model))) ? s.model : (models[0] || 'gemini-3.6-flash');
       var mopts = '';
-      models.forEach(function (m) { mopts += '<option value="' + m + '"' + (m === s.model ? ' selected' : '') + '>' + m + '</option>'; });
+      models.forEach(function (m) { mopts += '<option value="' + m + '"' + (m === curModel ? ' selected' : '') + '>' + m + '</option>'; });
       if (s.model && models.indexOf(s.model) < 0 && !(App.ai.isDeadModel && App.ai.isDeadModel(s.model))) mopts += '<option value="' + s.model + '" selected>' + s.model + '</option>';
       ms.innerHTML = mopts;
     }
@@ -604,6 +700,15 @@
     /* أصوات TTS لكل لغة */
     fillVoiceSelect(U.getEl('voiceTargetSelect'), p.targetLang || 'en', s['tts_voice_' + (p.targetLang || 'en')]);
     fillVoiceSelect(U.getEl('voiceNativeSelect'), p.nativeLang || 'ar', s['tts_voice_' + (p.nativeLang || 'ar')]);
+    /* سرعة النطق — تُطبَّق على نطق لغة الهدف: البطاقات والقصص (ratePct في tts.js) */
+    var rr = U.getEl('ttsRate');
+    if (rr) {
+      var r0 = Number(s.ttsRate);
+      if (!r0 || r0 < 0.5 || r0 > 2) r0 = 1;
+      rr.value = r0;
+      var rv = rr.parentElement.querySelector('.range-value');
+      if (rv) rv.textContent = r0 + 'x';
+    }
     /* الملف الشخصي في الشريط الجانبي — الاسم الحقيقي، لا "أحمد" الثابتة */
     var pn = U.qs('.profile-name');
     if (pn) pn.textContent = (p.name || '').trim() || App.t('profileGuest');
@@ -666,12 +771,233 @@
     if (btn) btn.style.display = (App.state.settings.translationAutoEnabled === false) ? 'none' : '';
   }
 
+  /* ═════════ عرض واجهة القصص المستقلة (Stories View) ═════════ */
+  function splitIntoSentences(text) {
+    if (!text) return [];
+    var raw = String(text).replace(/\r\n/g, '\n').split(/(?<=[.!?؟])\s+|\n+/);
+    return raw.map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; });
+  }
+
+  function pairStorySentences(story) {
+    if (!story) return [];
+    if (Array.isArray(story.sentences) && story.sentences.length) {
+      return story.sentences;
+    }
+    var tArr = splitIntoSentences(story.story || '');
+    var nArr = splitIntoSentences(story.translation || '');
+    var pairs = [];
+    for (var i = 0; i < tArr.length; i++) {
+      var n = (i < nArr.length) ? nArr[i] : (i === tArr.length - 1 ? nArr.slice(i).join(' ') : '');
+      pairs.push({ target: tArr[i], native: n });
+    }
+    return pairs;
+  }
+
+  /* ═════════ CEFR select for Stories creator ═════════ */
+  function renderStoriesCefrSelect() {
+    var sel = U.getEl('storiesCefrSelect');
+    if (!sel) return;
+    var levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+    var cur = (App.state.profile && App.state.profile.cefrLevel) || 'B1';
+    sel.innerHTML = levels.map(function (lv) {
+      var label = App.t('cefr' + lv) || lv;
+      return '<option value="' + lv + '"' + (lv === cur ? ' selected' : '') + '>' + lv + ' - ' + label + '</option>';
+    }).join('');
+  }
+
+  function renderStoriesView() {
+    var p = App.state.profile || { nativeLang: 'ar', targetLang: 'de', cefrLevel: 'B1' };
+    var targetName = U.langName(p.targetLang, App.state.lang);
+    var nativeName = U.langName(p.nativeLang, App.state.lang);
+
+    var targetBadge = U.getEl('storiesTargetLangBadge');
+    if (targetBadge) targetBadge.textContent = targetName;
+    var targetLabel = U.getEl('storiesTargetLangLabel');
+    if (targetLabel) targetLabel.textContent = (App.t('story') || 'القصة') + ' (' + targetName + ')';
+    var nativeLabel = U.getEl('storiesNativeLangLabel');
+    if (nativeLabel) nativeLabel.textContent = (App.t('translation') || 'الترجمة') + ' (' + nativeName + ')';
+
+    renderStoriesCefrSelect();
+
+    var story = App.state.lastStory;
+    var readerEl = U.getEl('viewStoriesReader');
+    var creatorEl = U.getEl('viewStoriesCreator');
+    var emptyEl = U.getEl('viewStoriesEmpty');
+    var newBtn = U.getEl('viewStoriesNewBtn');
+
+    if (!story || !story.story) {
+      if (readerEl) readerEl.style.display = 'none';
+      if (creatorEl) creatorEl.style.display = 'block';
+      if (emptyEl) emptyEl.style.display = 'none';
+      if (newBtn) newBtn.style.display = 'none';
+      return;
+    }
+
+    if (creatorEl) creatorEl.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (readerEl) readerEl.style.display = 'block';
+    if (newBtn) newBtn.style.display = 'inline-flex';
+
+    var wc = (story.story || '').split(/\s+/).filter(Boolean).length;
+    var titleEl = U.getEl('storiesViewTitle');
+    if (titleEl) titleEl.textContent = story.title || 'قصة قصيرة';
+    var subEl = U.getEl('storiesViewSub');
+    if (subEl) subEl.textContent = targetName + ' · ' + U.fmtInt(wc) + ' ' + App.t('wordsUnit') + ' · ' + (p.cefrLevel || 'B1');
+
+    var isInterlinear = !!App.state.interlinearStoryMode;
+    var toggleBtn = U.getEl('storiesToggleInterlinearBtn');
+    var toggleLabel = U.getEl('interlinearBtnLabel');
+    if (toggleBtn) {
+      toggleBtn.classList.toggle('active', isInterlinear);
+      if (toggleLabel) toggleLabel.textContent = isInterlinear ? App.t('interlinearHide') : App.t('interlinearToggle');
+    }
+
+    var nativeWrap = U.getEl('storiesNativeWrapper');
+    if (nativeWrap) {
+      nativeWrap.style.display = isInterlinear ? 'none' : 'block';
+    }
+
+    var textEl = U.getEl('storiesViewText');
+    if (textEl) {
+      var isTargetRtl = (p.targetLang === 'ar' || p.targetLang === 'ur' || p.targetLang === 'fa');
+      textEl.setAttribute('dir', isTargetRtl ? 'rtl' : 'ltr');
+      textEl.style.direction = isTargetRtl ? 'rtl' : 'ltr';
+      textEl.style.textAlign = isTargetRtl ? 'right' : 'left';
+
+      if (isInterlinear) {
+        var pairs = pairStorySentences(story);
+        var fmt = App.handlers && App.handlers.formatStoryWithWords;
+        var isNativeRtl = (p.nativeLang === 'ar' || p.nativeLang === 'ur' || p.nativeLang === 'fa');
+        textEl.innerHTML = pairs.map(function (pair) {
+          var targetHtml = fmt ? fmt(pair.target) : U.esc(pair.target);
+          return '<div class="story-interlinear-item">' +
+            '<div class="story-sentence-target" dir="' + (isTargetRtl ? 'rtl' : 'ltr') + '">' + targetHtml + '</div>' +
+            (pair.native ? '<div class="story-sentence-native" dir="' + (isNativeRtl ? 'rtl' : 'ltr') + '">💬 ' + U.esc(pair.native) + '</div>' : '') +
+          '</div>';
+        }).join('');
+      } else {
+        if (App.handlers && App.handlers.formatStoryWithWords) {
+          textEl.innerHTML = App.handlers.formatStoryWithWords(story.story || '');
+        } else {
+          textEl.textContent = story.story || '';
+        }
+      }
+    }
+
+    var trEl = U.getEl('storiesViewTranslation');
+    if (trEl && !isInterlinear) {
+      var isNativeRtl = (p.nativeLang === 'ar' || p.nativeLang === 'ur' || p.nativeLang === 'fa');
+      trEl.setAttribute('dir', isNativeRtl ? 'rtl' : 'ltr');
+      trEl.style.direction = isNativeRtl ? 'rtl' : 'ltr';
+      trEl.style.textAlign = isNativeRtl ? 'right' : 'left';
+      trEl.textContent = story.translation || '';
+    }
+
+    var vocabSection = U.getEl('storiesVocabSection');
+    var vocabContainer = U.getEl('storiesViewVocab');
+    if (story.vocabulary && story.vocabulary.length) {
+      if (vocabSection) vocabSection.style.display = 'block';
+      if (vocabContainer) {
+        var isTargetRtlVocab = (p.targetLang === 'ar' || p.targetLang === 'ur' || p.targetLang === 'fa');
+        var isNativeRtlVocab = (p.nativeLang === 'ar' || p.nativeLang === 'ur' || p.nativeLang === 'fa');
+        vocabContainer.innerHTML = story.vocabulary.map(function (w) {
+          return '<div class="story-vocab-card">' +
+            '<div class="vocab-word-target" dir="' + (isTargetRtlVocab ? 'rtl' : 'ltr') + '"><strong>' + U.esc(w.word) + '</strong></div>' +
+            '<div class="vocab-word-meaning" dir="' + (isNativeRtlVocab ? 'rtl' : 'ltr') + '">' + U.esc(w.meaning || '') + '</div>' +
+          '</div>';
+        }).join('');
+      }
+    } else {
+      if (vocabSection) vocabSection.style.display = 'none';
+    }
+
+    if (App.handlers && App.handlers.applyStoriesViewFontSize) {
+      App.handlers.applyStoriesViewFontSize();
+    }
+  }
+
+  /* ═════════ عرض وتعديل كلمات القسم المختار (Deck Cards Modal) ═════════ */
+  function renderDeckCardsList(deckId, search) {
+    var listEl = U.getEl('deckCardsList');
+    if (!listEl) return;
+    var d = deckById(deckId);
+    if (!d) return;
+
+    var modalTitle = U.getEl('deckCardsModalTitle');
+    var modalSub = U.getEl('deckCardsModalSub');
+    var allCards = cardsOf(deckId).filter(function (c) { return !c.deletedAt; });
+    var query = (search || '').trim().toLowerCase();
+
+    var filtered = query ? allCards.filter(function (c) {
+      return (c.front || '').toLowerCase().indexOf(query) >= 0 ||
+             (c.back || '').toLowerCase().indexOf(query) >= 0 ||
+             (c.example || '').toLowerCase().indexOf(query) >= 0 ||
+             (c.exampleTranslation || '').toLowerCase().indexOf(query) >= 0;
+    }) : allCards;
+
+    if (modalTitle) modalTitle.textContent = (App.t('deckWordsTitle') || 'تعديل كلمات القسم') + ': ' + (d.icon ? d.icon + ' ' : '') + d.name;
+    if (modalSub) {
+      var totalText = (App.t('totalWords') || 'إجمالي الكلمات') + ': ' + U.fmtInt(allCards.length);
+      var matchText = query ? ' (' + (App.t('matchingWords') || 'المطابقة') + ': ' + filtered.length + ')' : '';
+      modalSub.textContent = totalText + matchText;
+    }
+
+    if (!filtered.length) {
+      listEl.innerHTML = '<div class="empty-state" style="padding:24px 0;"><div class="empty-icon">🔍</div><div class="empty-title">' +
+        (query ? (App.t('noResults') || 'لا نتائج') : (App.t('noCardsYet') || 'لا توجد بطاقات بعد')) +
+        '</div></div>';
+      return;
+    }
+
+    var html = '';
+    filtered.forEach(function (c) {
+      var thumbHtml = c.imagePath
+        ? '<div class="deck-card-thumb-wrap"><img class="deck-card-thumb" data-img-path="' + U.esc(c.imagePath) + '" alt="" /></div>'
+        : '';
+      html += '<div class="deck-card-item" id="deckCardItem_' + c.id + '" data-card-id="' + c.id + '">' +
+        '<div class="deck-card-row">' +
+          thumbHtml +
+          '<div class="deck-card-info">' +
+            '<div class="deck-card-front">' + U.esc(c.front) + '</div>' +
+            '<div class="deck-card-back">' + U.esc(c.back) + '</div>' +
+            (c.example ? '<div class="deck-card-ex" dir="ltr">💬 ' + U.esc(c.example) + (c.exampleTranslation ? '<div class="deck-card-ex-tr" dir="rtl">' + U.esc(c.exampleTranslation) + '</div>' : '') + '</div>' : '') +
+          '</div>' +
+          '<div class="deck-card-actions">' +
+            '<button type="button" class="deck-card-btn" data-action="edit-inline-card" data-id="' + c.id + '" title="' + App.t('edit') + '">' +
+              '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>' +
+              '<span>' + App.t('edit') + '</span>' +
+            '</button>' +
+            '<button type="button" class="deck-card-btn del" data-action="del-deck-card" data-id="' + c.id + '" title="' + App.t('delete') + '">' +
+              '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
+            '</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    });
+
+    listEl.innerHTML = html;
+    loadDeckCardsThumbs();
+  }
+
+  function loadDeckCardsThumbs() {
+    var host = U.getEl('deckCardsList');
+    if (!host) return;
+    var imgs = host.querySelectorAll('img[data-img-path]');
+    Array.prototype.forEach.call(imgs, function (img) {
+      var p = img.getAttribute('data-img-path');
+      if (!p) return;
+      if (p.indexOf('data:') === 0) { img.src = p; return; }
+      App.handlers.imagePathToSrc(p).then(function (src) { if (src) img.src = src; });
+    });
+  }
+
   function renderAll() {
     renderHome();
     renderDecks();
     renderBrowse();
     renderSearch();
     if (U.qs('.view[data-view="stats"]').classList.contains('active')) renderStats();
+    if (U.qs('.view[data-view="stories"]').classList.contains('active')) renderStoriesView();
     renderDeckSelects();
     renderSettings();
     /* sidebar + bottom-nav badges */
@@ -687,10 +1013,13 @@
     renderAll: renderAll, renderHome: renderHome, renderDecks: renderDecks, renderBrowse: renderBrowse,
     renderSearch: renderSearch, renderStats: renderStats, renderBarChart: renderBarChart,
     renderStudyCard: renderStudyCard, renderSessionEnd: renderSessionEnd, renderDeckSelects: renderDeckSelects,
+    renderStoriesView: renderStoriesView, renderDeckCardsList: renderDeckCardsList,
+    fitFrontWord: fitFrontWord,
     renderColorRow: renderColorRow, renderEmojiRow: renderEmojiRow, renderSettings: renderSettings,
     updateLangLabels: updateLangLabels, updateTranslateBtnVisibility: updateTranslateBtnVisibility, fillVoiceSelect: fillVoiceSelect,
     updateKeyButtons: updateKeyButtons, fillUiLangSelect: fillUiLangSelect,
     deckById: deckById, cardsOf: cardsOf, dueCardsOf: dueCardsOf, newCardsOf: newCardsOf,
-    streakDays: streakDays, totalDueAvailable: totalDueAvailable, intervalLabel: intervalLabel
+    streakDays: streakDays, totalDueAvailable: totalDueAvailable, intervalLabel: intervalLabel,
+    pairStorySentences: pairStorySentences
   };
 })();

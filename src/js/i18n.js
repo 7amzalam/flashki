@@ -6,7 +6,7 @@
   var App = window.App = window.App || {};
 
   var EMERGENCY = {
-    brandTag: 'Flashki', navHome: 'الرئيسية', navReview: 'مراجعة', navBrowse: 'تصفح', navSearch: 'بحث',
+    brandTag: 'Flashki', navHome: 'الرئيسية', navReview: 'مراجعة', navStories: 'القصص', navBrowse: 'تصفح', navSearch: 'بحث',
     navStats: 'الإحصائيات', navAdd: 'إضافة', navSettings: 'الإعدادات', pageHome: 'بطاقاتي',
     noCardsYet: 'لا توجد بطاقات بعد', save: 'حفظ', cancel: 'إلغاء', delete: 'حذف'
   };
@@ -82,11 +82,13 @@
       }
     });
     updateTitle(App.state.lastView || 'home');
+    if (App.render && App.render.updateLangLabels) App.render.updateLangLabels();
     if (App.updateAiModeUi) App.updateAiModeUi(); /* مزامنة وضع بطاقات/قصة بعد تغيير لغة الواجهة */
+    if (App.render && App.render.renderStoriesView && App.state.lastView === 'stories') App.render.renderStoriesView();
   }
 
   function updateTitle(view) {
-    var keyMap = { home: 'pageHome', decks: 'pageDecks', study: 'pageStudy', browse: 'pageBrowse', search: 'pageSearch', stats: 'pageStats', add: 'pageAdd', settings: 'pageSettings', 'session-end': 'pageSessionEnd' };
+    var keyMap = { home: 'pageHome', decks: 'pageDecks', study: 'pageStudy', browse: 'pageBrowse', search: 'pageSearch', stats: 'pageStats', add: 'pageAdd', settings: 'pageSettings', 'session-end': 'pageSessionEnd', stories: 'navStories' };
     var key = keyMap[view] || 'pageHome';
     var el = App.util.getEl('pageTitle');
     if (el) el.innerHTML = t(key);

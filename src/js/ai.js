@@ -6,7 +6,12 @@
   var App = window.App = window.App || {};
   var U = App.util;
 
-  function profile() { return App.state.profile || { nativeLang: 'ar', targetLang: 'en', cefrLevel: 'B1' }; }
+  function profile() {
+    var p = Object.assign({}, App.state.profile || { nativeLang: 'ar', targetLang: 'en', cefrLevel: 'B1' });
+    var sel = document.getElementById('aiTargetLangSelect');
+    if (sel && sel.value) p.targetLang = sel.value;
+    return p;
+  }
   /* أسماء اللغات داخل البرومبت بالإنجليزية دائماً (جودة النموذج) — بغض النظر عن لغة الواجهة.
    "English" لا تظهر إلا إذا كانت native/target = en فعلاً */
   function ln(code) { return U.langName(code, 'en'); }
@@ -25,53 +30,30 @@
       'You are a professional flashcard generator for ' + article(nativeName) + ' ' + nativeName + ' speaker learning ' + targetName + '.\n' +
       '\n' +
       'User profile:\n' +
-      '- Native language: ' + nativeName + ' (' + nativeCode + ')\n' +
-      '- Target language: ' + targetName + ' (' + targetCode + ')\n' +
+      '- Native language (learner speaks this): ' + nativeName + ' (' + nativeCode + ')\n' +
+      '- Target language (learner is learning this): ' + targetName + ' (' + targetCode + ')\n' +
       '- CEFR level: ' + cefr + '\n' +
       '\n' +
-      'Generate exactly ' + count + ' cards in this exact format:\n' +
-      '- front: word or expression in ' + targetName + '\n' +
-      '- back: precise meaning in ' + nativeName + '\n' +
-      '- example: natural sentence in ' + targetName + '\n' +
+      'CRITICAL LANGUAGE RULES (NEVER INVERT OR SWAP!):\n' +
+      '1. "front": MUST BE IN ' + targetName.toUpperCase() + ' ONLY (e.g. German: "das Geheimnis", "erforschen"). NEVER put ' + nativeName + ' (Arabic) on front!\n' +
+      '2. "back": MUST BE IN ' + nativeName.toUpperCase() + ' ONLY (e.g. Arabic: "السر", "يستكشف"). NEVER put ' + targetName + ' (German) on back!\n' +
+      '3. "example": ALWAYS provide a natural, focused example sentence in ' + targetName.toUpperCase() + ' containing the front word.\n' +
+      '4. "example_translation": ALWAYS provide the Arabic/native translation in ' + nativeName.toUpperCase() + ' for that example sentence.\n' +
+      '\n' +
+      'Generate exactly ' + count + ' rich cards in this exact format:\n' +
+      '- front: word or expression in ' + targetName + ' (TARGET LANGUAGE ONLY; for German nouns include der/die/das; for verbs use infinitive)\n' +
+      '- back: precise meaning in ' + nativeName + ' (NATIVE LANGUAGE ONLY)\n' +
+      '- example: natural focused sentence in ' + targetName + '\n' +
       '- example_translation: translation of the example in ' + nativeName + '\n' +
       '- tags: array of 2-3 relevant categories\n' +
       '- cefr: the CEFR level of the card (A1|A2|B1|B2|C1|C2)\n' +
       '\n' +
-      'EXTRACTION RULES — apply strictly:\n' +
-      '\n' +
-      '1. FREQUENCY FILTER:\n' +
-      '   - Include words that appear >=2 times in the text\n' +
-      '   - Skip words that appear only once UNLESS they are marked as high-value (see #3)\n' +
-      '\n' +
-      '2. PRIORITY ORDER (extract in this order, stop when reaching the requested count):\n' +
-      '   a) High-frequency common words (top 3000 in ' + targetName + ')\n' +
-      '   b) Words at or just above the user\'s CEFR level (' + cefr + ')\n' +
-      '   c) Idiomatic expressions and collocations (2+ words)\n' +
-      '   d) Useful phrasal verbs and prepositions combinations\n' +
-      '   e) Technical words ONLY if they appear >=3 times\n' +
-      '\n' +
-      '3. ALWAYS SKIP:\n' +
-      '   - Proper names (people, cities, brands)\n' +
-      '   - Numbers and dates\n' +
-      '   - Single characters or punctuation\n' +
-      '   - Basic stopwords in either language: articles, pronouns, conjunctions, auxiliary verbs\n' +
-      '   - Words the user already knows at level ' + cefr + ' minus 1 (e.g., if user is B1, skip A1 words)\n' +
-      '\n' +
-      '4. DIFFICULTY BALANCE:\n' +
-      '   - 40% at user\'s level\n' +
-      '   - 30% slightly above (to push growth)\n' +
-      '   - 20% review of below-level but common words\n' +
-      '   - 10% idioms/special expressions\n' +
-      '\n' +
-      '5. QUALITY BAR:\n' +
-      '   - Every back must be a precise definition, not a vague synonym\n' +
-      '   - Every example must be a real, natural sentence (not grammatically awkward)\n' +
-      '   - Every example must use the word in a realistic context\n' +
-      '   - Idioms must include cultural/usage note when relevant\n' +
-      '\n' +
-      '6. DUPLICATES:\n' +
-      '   - Skip any word already present in the same deck (case-insensitive, trimmed)\n' +
-      '   - Report count of skipped duplicates';
+      'EXTRACTION RULES:\n' +
+      '1. Extract ' + count + ' high-value vocabulary items and expressions from across the entire text suitable for CEFR ' + cefr + ' learners.\n' +
+      '2. Include diverse nouns (with gender article), essential verbs, adjectives, and natural collocations.\n' +
+      '3. Do NOT limit to words repeated multiple times. Extract key educational vocabulary even if it appears once in the text.\n' +
+      '4. Skip proper names, dates, numbers, and basic stopwords (pronouns, auxiliary verbs).\n' +
+      '5. Always provide realistic context sentences in "example" and "example_translation".';
 
     if (!withContext) {
       head += '\n\nNOTE: set "example" and "example_translation" to empty strings "" for every card.';
@@ -111,7 +93,8 @@
   /* ═════════ برومبت الترجمة الفورية ═════════ */
   function buildTranslatePrompt(text) {
     var p = profile();
-    return 'Translate the following ' + ln(p.targetLang) + ' text to ' + ln(p.nativeLang) + '.\n' +
+    return 'Translate the following text strictly from ' + ln(p.targetLang) + ' into ' + ln(p.nativeLang) + '.\n' +
+      'Text is in ' + ln(p.targetLang) + '. You must output the translation in ' + ln(p.nativeLang) + '.\n' +
       'Provide ONLY the translation, no explanation, no quotes.\n' +
       "If it's a single word, give the most common meaning + part of speech in parentheses.\n" +
       "If it's a phrase, give the natural translation.\n" +
@@ -120,10 +103,35 @@
   }
 
   /* ═════════ برومبت توليد القصة (وضع قصة) ═════════ */
-  function storyLength(cefr) {
-    if (cefr === 'A1' || cefr === 'A2') return '80-120 words';
-    if (cefr === 'C1' || cefr === 'C2') return '200-300 words';
-    return '120-200 words';
+  /* عقد الصعوبة لكل مستوى CEFR: كلما ارتفع المستوى زاد الطول والمفردات وتعقيد التركيب */
+  function storySpec(cefr) {
+    var map = {
+      A1: {
+        len: '80-120 words', vocab: '4-6',
+        desc: 'Absolute beginner (A1). Use ONLY the most basic high-frequency vocabulary. Very short simple sentences (max 8-10 words each). Present tense only. No subordinate clauses. Concrete everyday situations (family, food, school, shopping).'
+      },
+      A2: {
+        len: '120-170 words', vocab: '5-8',
+        desc: 'Elementary (A2). Use A1-A2 vocabulary with at most 2-3 slightly harder stretch words. Short sentences (max 12 words). Present tense and simple past. Basic connectors (and, but, then, because). Familiar everyday topics.'
+      },
+      B1: {
+        len: '170-240 words', vocab: '6-9',
+        desc: 'Intermediate (B1). Mainly B1 vocabulary with a few B2 stretch words. Medium-length sentences with common subordinate clauses. Narration mostly in past tense. Everyday but richer topics (travel, work, friendships).'
+      },
+      B2: {
+        len: '240-320 words', vocab: '7-10',
+        desc: 'Upper-intermediate (B2). Mainly B2 vocabulary with some C1 stretch words. Varied sentence structures, common idiomatic expressions, opinions and mildly abstract topics.'
+      },
+      C1: {
+        len: '320-420 words', vocab: '8-12',
+        desc: 'Advanced (C1). Rich C1 vocabulary, idioms, nuanced connectors, complex and varied sentence structures, flexible register. Fluent natural style close to authentic texts.'
+      },
+      C2: {
+        len: '420-550 words', vocab: '10-15',
+        desc: 'Mastery (C2). Near-native sophistication: precise and rare vocabulary, idioms, stylistic devices (metaphor, irony, wordplay), elegant complex structures. Full literary fluency.'
+      }
+    };
+    return map[cefr] || map.B1;
   }
 
   function buildStoryPrompt(text) {
@@ -131,6 +139,7 @@
     var nativeName = ln(p.nativeLang), targetName = ln(p.targetLang);
     var nativeCode = p.nativeLang || 'ar', targetCode = p.targetLang || 'en';
     var cefr = p.cefrLevel || 'B1';
+    var spec = storySpec(cefr);
     return 'You are a professional language-learning story writer for ' + article(nativeName) + ' ' + nativeName +
       ' speaker learning ' + targetName + '.\n' +
       '\n' +
@@ -141,20 +150,21 @@
       '\n' +
       'Write a short story in ' + targetName + ' for a learner at CEFR level ' + cefr + '.\n' +
       '\n' +
-      'STORY RULES:\n' +
-      '- Length: ' + storyLength(cefr) + '\n' +
-      '- Use mostly vocabulary at CEFR level ' + cefr + ', with a few words slightly above to stretch learning\n' +
-      '- Natural, engaging plot with a clear beginning, middle and end\n' +
-      '- Sentence structures appropriate to the level, but not childish\n' +
+      'DIFFICULTY CONTRACT (MUST FOLLOW EXACTLY):\n' +
+      '- Target length: ' + spec.len + ' — count the words before answering.\n' +
+      '- ' + spec.desc + '\n' +
+      '- The higher the CEFR level, the longer the story, the richer the vocabulary and the more complex the grammar. NEVER write a ' + cefr + ' story with beginner-level vocabulary or a beginner story with advanced vocabulary.\n' +
+      '- Natural, engaging plot with a clear beginning, middle and end, appropriate to the level but not childish\n' +
       '- Use the user input below as the core theme, or weave the given words naturally into the story\n' +
       '\n' +
       'Return STRICT JSON only — no markdown, no code fences, no commentary:\n' +
-      '{"title":"...","story":"...","translation":"...","vocabulary":[{"word":"...","meaning":"..."}]}\n' +
+      '{"title":"...","story":"...","translation":"...","sentences":[{"target":"...","native":"..."}],"vocabulary":[{"word":"...","meaning":"..."}]}\n' +
       '\n' +
       '- title: short story title in ' + targetName + '\n' +
       '- story: the complete story in ' + targetName + '\n' +
       '- translation: complete faithful translation of the story in ' + nativeName + '\n' +
-      '- vocabulary: 5-8 key words or expressions from the story that a learner at ' + cefr + ' might not know, each with its precise meaning in ' + nativeName + '\n' +
+      '- sentences: array of each individual sentence in ' + targetName + ' ("target") matched with its direct translation in ' + nativeName + ' ("native")\n' +
+      '- vocabulary: ' + spec.vocab + ' key words or expressions from the story that a learner at ' + cefr + ' might not know, each with its precise meaning in ' + nativeName + '\n' +
       '\n' +
       'USER INPUT (topic, theme or words to include):\n' +
       '"""\n' + text + '\n"""';
@@ -170,22 +180,33 @@
     var vocab = (Array.isArray(data.vocabulary) ? data.vocabulary : []).map(function (v) {
       if (!v || !v.word) return null;
       return { word: String(v.word).trim(), meaning: String(v.meaning || '').trim() };
-    }).filter(Boolean).slice(0, 8);
+    }).filter(Boolean).slice(0, 15);
+    var sentences = [];
+    if (Array.isArray(data.sentences) && data.sentences.length) {
+      sentences = data.sentences.map(function (pair) {
+        if (!pair || !pair.target) return null;
+        return {
+          target: String(pair.target).trim(),
+          native: String(pair.native || pair.translation || '').trim()
+        };
+      }).filter(Boolean);
+    }
     return {
       title: String(data.title || '').trim(),
       story: String(data.story).trim(),
       translation: String(data.translation || '').trim(),
+      sentences: sentences,
       vocabulary: vocab
     };
   }
 
   /* ═════════ الاتصال ═════════ */
-  /* نماذج Gemini المجانية للحسابات الجديدة — مختبرة فعلياً بالمفتاح (10/2026):
-     الحية: 3.8-flash / 3.6-flash / flash-latest / flash-lite-latest (+ 3.5/3.1-flash-lite).
-     الميتة: 2.5/2.0/1.5 (404 للحسابات الجديدة). Pro كلها مدفوعة (429 quota).
-     سلسلة الاحتياط: عند خطأ نموذج (404) أو ازدحام (429/503 high demand) ينتقل تلقائياً للنموذج التالي */
-  var MODEL_CHAIN = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
-  var DEAD_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-3.8-pro', 'gemini-3.8-flash-lite', 'gemini-3-flash'];
+  /* نماذج Gemini الحية المجانية:
+     gemini-3.6-flash و gemini-3.8-flash و gemini-3.5-flash-lite (+ flash-latest).
+     النماذج القديمة (2.5 / 2.0 / 1.5) أوقفتها جوجل وتعيد 404.
+     سلسلة الاحتياط: عند خطأ نموذج أو ازدحام (429/503) ينتقل تلقائياً للنموذج التالي */
+  var MODEL_CHAIN = ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
+  var DEAD_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-3.8-pro', 'gemini-1.0-pro', 'gemini-pro'];
 
   /* ⚠️ v20: بدون thinkingConfig(budget=0) يستهلك النموذج كل الرصيد في "التفكير"
      (thoughtsTokenCount >> candidatesTokenCount) ويعيد نصاً فارغاً — هذا هو سبب
@@ -309,6 +330,9 @@
     return attempt(false);
   }
 
+  var AR_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+  function isArabicText(t) { return AR_REGEX.test(String(t || '')); }
+
   /* ═════════ تحليل رد Gemini ═════════ */
   function parseCards(raw) {
     var s = String(raw || '').trim();
@@ -318,14 +342,40 @@
     var data = JSON.parse(s);
     var cards = (data && (data.cards || data.flashcards)) || [];
     if (!Array.isArray(cards)) throw new Error('bad format');
+    var p = profile();
+    var nativeIsArabic = (p.nativeLang === 'ar');
+    var targetIsArabic = (p.targetLang === 'ar');
+
     var out = [];
     cards.forEach(function (c) {
       if (!c || !c.front || !c.back) return;
+      var f = String(c.front).trim();
+      var b = String(c.back).trim();
+      var ex = c.example ? String(c.example).trim() : '';
+      var exTr = c.example_translation ? String(c.example_translation).trim() : '';
+
+      /* التحقق من عدم عكس اللغات: الوجه الأمامي يجب أن يكون بلغة التعلم، والخلفي بلغة المستخدم */
+      if (nativeIsArabic && !targetIsArabic) {
+        if (isArabicText(f) && !isArabicText(b)) {
+          var tmpF = f; f = b; b = tmpF;
+          if (isArabicText(ex) && !isArabicText(exTr)) {
+            var tmpEx = ex; ex = exTr; exTr = tmpEx;
+          }
+        }
+      } else if (!nativeIsArabic && targetIsArabic) {
+        if (!isArabicText(f) && isArabicText(b)) {
+          var tmpF2 = f; f = b; b = tmpF2;
+          if (!isArabicText(ex) && isArabicText(exTr)) {
+            var tmpEx2 = ex; ex = exTr; exTr = tmpEx2;
+          }
+        }
+      }
+
       out.push({
-        front: String(c.front).trim(),
-        back: String(c.back).trim(),
-        example: c.example ? String(c.example).trim() : '',
-        exampleTranslation: c.example_translation ? String(c.example_translation).trim() : '',
+        front: f,
+        back: b,
+        example: ex,
+        exampleTranslation: exTr,
         tags: Array.isArray(c.tags) ? c.tags.map(function (t) { return String(t).trim(); }).filter(Boolean).slice(0, 3) : [],
         cefr: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].indexOf(c.cefr) >= 0 ? c.cefr : null
       });
@@ -389,6 +439,56 @@
     return callSmart(settings.apiKey, prompt, true).then(parseStory);
   }
 
+  /* توليد بطاقة واحدة مباشرة من كلمة داخل سياق القصة */
+  function createCardFromWord(word, contextSentence) {
+    var settings = App.state.settings;
+    if (!settings.apiKey) return Promise.reject({ message: App.t('aiNoKey') });
+    var p = profile();
+    var nativeName = ln(p.nativeLang), targetName = ln(p.targetLang);
+    var prompt =
+      'You are creating a language learning flashcard for ' + article(nativeName) + ' ' + nativeName + ' speaker learning ' + targetName + '.\n' +
+      'Word to learn: "' + word + '"\n' +
+      (contextSentence ? 'Context in story: "' + contextSentence + '"\n' : '') +
+      '\n' +
+      'Generate STRICT JSON only (no markdown, no backticks):\n' +
+      '{"front":"...", "back":"...", "example":"...", "example_translation":"...", "cefr":"' + (p.cefrLevel || 'B1') + '", "tags":["story"]}\n' +
+      '\n' +
+      'RULES:\n' +
+      '- "front": The base / dictionary form of the word in ' + targetName + ':\n' +
+      '  * If the word is an inflected verb in any tense (e.g. "arbeitete", "blieb", "ging", "sah", "hatte", "machte"), you MUST return the INFINITIVE / LEMMA form (e.g. "arbeiten", "bleiben", "gehen", "sehen", "haben", "machen"). NEVER keep the conjugated or past form!\n' +
+      '  * If the word is a noun in ' + targetName + ' (e.g. German/Spanish/French), you MUST prepend the correct definite article (der/die/das in German, el/la in Spanish) and capitalize correctly (e.g. "der Projektleiter", "die Kollegin", "das Büro", "das Problem", "die Datei").\n' +
+      '- "back": Precise concise meaning/translation in ' + nativeName + ' (e.g. Arabic) only.\n' +
+      '- "example": The sentence from the story containing the word (or a concise clear example sentence in ' + targetName + ').\n' +
+      '- "example_translation": Natural faithful translation of the example sentence in ' + nativeName + '.\n';
+
+    return callSmart(settings.apiKey, prompt, true).then(function (raw) {
+      var s = String(raw || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+      var start = s.indexOf('{'), end = s.lastIndexOf('}');
+      if (start >= 0 && end > start) s = s.slice(start, end + 1);
+      var data = JSON.parse(s);
+      var f = String(data.front || word).trim();
+      var b = String(data.back || '').trim();
+      var ex = String(data.example || contextSentence || '').trim();
+      var exTr = String(data.example_translation || '').trim();
+
+      if (p.nativeLang === 'ar' && p.targetLang !== 'ar') {
+        if (isArabicText(f) && !isArabicText(b)) {
+          var tmp = f; f = b; b = tmp;
+          var tmpEx = ex; ex = exTr; exTr = tmpEx;
+        }
+      }
+
+      return {
+        front: f,
+        back: b,
+        example: ex,
+        exampleTranslation: exTr,
+        cefr: data.cefr || p.cefrLevel || 'B1',
+        tags: Array.isArray(data.tags) ? data.tags : ['story']
+      };
+    });
+  }
+
   /* تحقق سريع من صلاحية المفتاح — طلب اختبار مصغّر قبل الحفظ.
      يرجع { ok:true } أو { ok:false, kind:'invalid'|'busy'|'geo'|'network', message } —
      kind=busy/geo يعني أن المصادقة نجحت والمفتاح صالح (يُحفظ) والخطأ في الخدمة/الشبكة */
@@ -402,5 +502,13 @@
     });
   }
 
-  App.ai = { generate: generate, parseCards: parseCards, buildPrompt: buildPrompt, buildTranslatePrompt: buildTranslatePrompt, translate: translate, extractTranslation: extractTranslation, verifyKey: verifyKey, classifyKeyError: classifyKeyError, isBusyError: isBusyErr, buildStoryPrompt: buildStoryPrompt, generateStory: generateStory, parseStory: parseStory, modelList: modelList, isDeadModel: function (m) { return DEAD_MODELS.indexOf(m) >= 0; } };
+  App.ai = {
+    generate: generate, parseCards: parseCards, buildPrompt: buildPrompt,
+    buildTranslatePrompt: buildTranslatePrompt, translate: translate,
+    extractTranslation: extractTranslation, verifyKey: verifyKey,
+    classifyKeyError: classifyKeyError, isBusyError: isBusyErr,
+    buildStoryPrompt: buildStoryPrompt, generateStory: generateStory, parseStory: parseStory,
+    createCardFromWord: createCardFromWord,
+    modelList: modelList, isDeadModel: function (m) { return DEAD_MODELS.indexOf(m) >= 0; }
+  };
 })();

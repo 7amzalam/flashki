@@ -159,10 +159,56 @@
     return Math.abs(ci - ui);
   }
 
+  /* ضغط وتحجيم الصورة بواسطة HTML5 Canvas قبل التخزين (توفير 90% مساحة وسرعة فائقة) */
+  function compressImage(file, maxDim, quality) {
+    maxDim = maxDim || 1080;
+    quality = quality || 0.82;
+    return new Promise(function (resolve, reject) {
+      if (!file) { reject(new Error('no file')); return; }
+      var reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = function () {
+        var img = new Image();
+        img.onerror = reject;
+        img.onload = function () {
+          var w = img.naturalWidth || img.width;
+          var h = img.naturalHeight || img.height;
+          var scale = 1;
+          if (w > maxDim || h > maxDim) {
+            scale = Math.min(maxDim / w, maxDim / h);
+          }
+          var nw = Math.max(1, Math.round(w * scale));
+          var nh = Math.max(1, Math.round(h * scale));
+          var canvas = document.createElement('canvas');
+          canvas.width = nw;
+          canvas.height = nh;
+          var ctx = canvas.getContext('2d');
+          if (!ctx) { reject(new Error('no 2d canvas')); return; }
+          ctx.drawImage(img, 0, 0, nw, nh);
+          var outFormat = (file.type === 'image/png' && scale === 1 && file.size < 350 * 1024) ? 'image/png' : 'image/jpeg';
+          var dataUrl = canvas.toDataURL(outFormat, quality);
+          var b64 = dataUrl.split(',')[1] || '';
+          var ext = outFormat === 'image/png' ? 'png' : 'jpg';
+          resolve({
+            dataUrl: dataUrl,
+            b64: b64,
+            ext: ext,
+            width: nw,
+            height: nh,
+            approxBytes: Math.round(b64.length * 0.75)
+          });
+        };
+        img.src = String(reader.result || '');
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   App.util = {
     getEl: getEl, qsa: qsa, qs: qs, esc: esc, escRe: escRe, fmtInt: fmtInt, fmtTime: fmtTime,
     todayKey: todayKey, dayDiff: dayDiff, toast: toast, uid: uid, debounce: debounce,
     ringSvg: ringSvg, shuffle: shuffle, blobToDataURL: blobToDataURL, dataURLToBlob: dataURLToBlob,
+    compressImage: compressImage,
     LANGS: LANGS, UI_LANGS: UI_LANGS, uiLangInfo: uiLangInfo, detectTextLang: detectTextLang, langName: langName,
     CEFR_ORDER: CEFR_ORDER, cefrDistance: cefrDistance
   };

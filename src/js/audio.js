@@ -79,11 +79,17 @@
     if (!container._blob) return;
     try {
       if (container._audio) { try { container._audio.pause(); } catch (e) {} }
+      if (typeof container._blob === 'string') {
+        var aStr = new Audio(container._blob);
+        container._audio = aStr;
+        aStr.play().catch(function (e) { console.warn('Audio play failed', e); });
+        return;
+      }
       var url = URL.createObjectURL(container._blob);
       var a = new Audio(url);
       container._audio = a;
       a.onended = function () { URL.revokeObjectURL(url); };
-      a.play();
+      a.play().catch(function (e) { console.warn('Audio play failed', e); });
     } catch (e) { U.toast(App.t('recDenied'), 'error'); }
   }
 
@@ -115,5 +121,22 @@
     return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
   }
 
-  App.audio = { supported: supported, toggle: toggle, play: play, clear: clear, attach: attach };
+  function playSource(source) {
+    if (!source) return;
+    try {
+      if (typeof source === 'string') {
+        var a = new Audio(source);
+        a.play().catch(function (e) { console.warn('Audio play failed', e); });
+      } else if (source instanceof Blob) {
+        var url = URL.createObjectURL(source);
+        var a2 = new Audio(url);
+        a2.onended = function () { URL.revokeObjectURL(url); };
+        a2.play().catch(function (e) { console.warn('Audio play failed', e); });
+      }
+    } catch (e) {
+      console.warn('playSource error', e);
+    }
+  }
+
+  App.audio = { supported: supported, toggle: toggle, play: play, clear: clear, attach: attach, playSource: playSource };
 })();
