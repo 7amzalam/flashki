@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- ========================================== -->
+    <!-- تحسينات محركات البحث (SEO) -->
+    <!-- ========================================== -->
+    <title>Flashki — تطبيق سطح المكتب لتعلم اللغات بالذكاء الاصطناعي</title>
+    <meta name="description" content="تطبيق سطح مكتب مجاني ومفتوح المصدر يحوّل أي نص إلى بطاقات وقصص تفاعلية مدعومة بالذكاء الاصطناعي. يعمل محلياً 100%، بنطق بشري، ويدعم 8 لغات.">
+    <meta name="keywords" content="تعلم اللغات, تطبيق سطح مكتب, بطاقات تعليمية, تكرار متباعد, ذكاء اصطناعي, Edge TTS, تعلم العربية, تعلم الإنجليزية, Flashki">
+    <meta name="author" content="7amzalam">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://7amzalam.github.io/flashki/">
+
+    <!-- Open Graph (للمشاركة على فيسبوك، واتساب، لينكد إن) -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://7amzalam.github.io/flashki/">
+    <meta property="og:title" content="Flashki — تعلم اللغات باحترافية وبخصوصية تامة">
+    <meta property="og:description" content="حوّل أي نص إلى بطاقات وقصص تفاعلية بالذكاء الاصطناعي. يعمل محلياً 100%، بنطق بشري، ومجاني ومفتوح المصدر.">
+    <meta property="og:image" content="https://7amzalam.github.io/flashki/og-image.png">
+
+    <!-- Twitter Card (للمشاركة على تويتر) -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://7amzalam.github.io/flashki/">
+    <meta property="twitter:title" content="Flashki — تعلم اللغات باحترافية وبخصوصية تامة">
+    <meta property="twitter:description" content="حوّل أي نص إلى بطاقات وقصص تفاعلية بالذكاء الاصطناعي. يعمل محلياً 100%، بنطق بشري، ومجاني ومفتوح المصدر.">
+    <meta property="twitter:image" content="https://7amzalam.github.io/flashki/og-image.png">
+
+    <!-- البيانات المنظمة (JSON-LD) لتعريف محركات البحث بالتطبيق -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Flashki",
+      "operatingSystem": "Windows, Linux",
+      "applicationCategory": "EducationalApplication",
+      "description": "تطبيق سطح مكتب مجاني ومفتوح المصدر لتعلم اللغات. يحوّل أي نص إلى بطاقات وقصص تفاعلية مدعومة بالذكاء الاصطناعي، ويعمل محلياً 100% بنطق بشري.",
+      "url": "https://7amzalam.github.io/flashki/",
+      "downloadUrl": "https://github.com/7amzalam/flashki/releases",
+      "softwareVersion": "1.1.0",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "7amzalam",
+        "url": "https://github.com/7amzalam"
+      },
+      "inLanguage": "ar"
+    }
+    </script>
+
+    <!-- Readex Pro Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        :root {
+            --primary: #7c3aed;
+            --primary-hover: #6d28d9;
+            --primary-light: #f3e8ff;
+            --bg-main: #f8fafc;
+            --bg-card: #ffffff;
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
+            --border-light: #e2e8f0;
+            --font-main: 'Readex Pro', sans-serif;
+            --shadow-soft: 0 10px 40px -10px rgba(0, 0, 0, 0.08);
+            --shadow-glow: 0 20px 40px -10px rgba(124, 58, 237, 0.15);
+            
+            --logo-dark: #1e3a8a;
+            --logo-light: #0ea5e9;
+            --logo-orange: #f97316;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font-main); }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+            line-height: 1.6;
+            overflow-x: hidden;
+            transition: all 0.3s ease;
+        }
+
+        a { text-decoration: none; color: inherit; }
+
+        /* --- Navbar --- */
+        nav {
+            position: fixed; top: 0; width: 100%; padding: 0.8rem 5%;
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(16px);
+            z-index: 1000; border-bottom: 1px solid var(--border-light);
+        }
+        
+        .logo-container { display: flex; align-items: center; gap: 12px; direction: ltr; }
+        .logo-text { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px; display: flex; align-items: baseline; }
+        .logo-text .flash { color: var(--logo-dark); }
+        .logo-text .ki { color: var(--logo-light); }
+
+        .logo-icon { position: relative; width: 44px; height: 44px; }
+        .logo-bg-orange { position: absolute; top: -4px; right: -4px; width: 100%; height: 100%; background: var(--logo-orange); border-radius: 12px; z-index: 1; }
+        .logo-bg-blue { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--logo-dark); border-radius: 12px; z-index: 2; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 10px rgba(30, 58, 138, 0.2); }
+
+        /* القائمة والروابط */
+        .nav-links { display: flex; gap: 2rem; align-items: center; font-weight: 600; font-size: 1rem; }
+        .nav-links a.nav-link { color: var(--text-muted); transition: color 0.2s; padding: 0.5rem 0; cursor: pointer;}
+        .nav-links a.nav-link:hover { color: var(--primary); }
+        
+        .lang-toggle {
+            background: transparent; border: 1px solid var(--border-light); color: var(--text-dark);
+            padding: 0.4rem 0.8rem; border-radius: 8px; cursor: pointer; font-family: inherit; font-weight: 700;
+            transition: all 0.2s; display: flex; align-items: center; gap: 4px; margin: 0 10px;
+        }
+        .lang-toggle:hover { border-color: var(--primary); color: var(--primary); }
+
+        .btn-nav-download {
+            background: linear-gradient(135deg, #fb923c, #f97316);
+            color: white !important; padding: 0.6rem 1.5rem; border-radius: 50px; font-weight: 700;
+            display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 15px rgba(249, 115, 22, 0.4);
+            transition: all 0.3s ease;
+        }
+        .btn-nav-download:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(249, 115, 22, 0.6); }
+
+        /* --- Hero Section --- */
+        .hero {
+            position: relative; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; text-align: center;
+            padding: 10rem 5% 6rem; background: var(--bg-main); overflow: hidden;
+        }
+
+        .hero::before {
+            content: ''; position: absolute; top: -10%; left: 50%; transform: translateX(-50%);
+            width: 80vw; height: 80vw; max-width: 1000px; max-height: 1000px;
+            background: radial-gradient(circle, rgba(124, 58, 237, 0.08) 0%, rgba(255, 255, 255, 0) 70%);
+            z-index: -1;
+        }
+
+        .hero-badges { display: flex; gap: 12px; margin-bottom: 1.5rem; }
+        .badge {
+            padding: 0.4rem 1rem; border-radius: 50px; font-size: 0.85rem; font-weight: 600;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .badge.desktop { background: #f3e8ff; color: var(--primary); border: 1px solid #e9d5ff; }
+        .badge.android { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 800; line-height: 1.2;
+            margin-bottom: 1rem; max-width: 800px; color: var(--text-dark); letter-spacing: -1px;
+        }
+        .hero h1 span { color: var(--primary); }
+        .hero p {
+            font-size: 1.2rem; color: var(--text-muted); max-width: 600px; margin-bottom: 2.5rem; font-weight: 400;
+        }
+
+        .hero-buttons { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; margin-bottom: 4rem; }
+        .btn-primary {
+            background: var(--primary); color: #ffffff !important; padding: 1rem 2.5rem;
+            border-radius: 12px; font-size: 1.1rem; font-weight: 700;
+            display: flex; align-items: center; gap: 10px; transition: all 0.3s;
+            box-shadow: 0 10px 25px rgba(124, 58, 237, 0.3);
+        }
+        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-3px); box-shadow: 0 15px 30px rgba(124, 58, 237, 0.4); }
+
+        /* --- 3D Flip Flashcard --- */
+        .mockup-wrapper { width: 100%; max-width: 850px; perspective: 1500px; margin: 0 auto; position: relative; z-index: 10; }
+        
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .flashcard-scene { width: 100%; height: 400px; position: relative; animation: float 6s ease-in-out infinite; }
+        .flashcard { width: 100%; height: 100%; position: relative; transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1); transform-style: preserve-3d; cursor: pointer; }
+        .flashcard.flipped { transform: rotateY(180deg); }
+
+        .card-face {
+            position: absolute; width: 100%; height: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+            border-radius: 24px; border: 1px solid var(--border-light); background: #f8f8fc;
+            box-shadow: var(--shadow-soft), var(--shadow-glow);
+            display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 2rem;
+        }
+
+        .card-front { z-index: 2; }
+        .card-back { transform: rotateY(180deg); background: white; }
+
+        .app-header { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+        .speaker-btn { width: 45px; height: 45px; border-radius: 50%; background: white; display: flex; justify-content: center; align-items: center; color: var(--primary); box-shadow: 0 2px 10px rgba(0,0,0,0.05); font-size: 1.4rem;}
+        .tags { display: flex; gap: 8px; }
+        .tag { background: white; padding: 0.3rem 0.8rem; border-radius: 8px; font-size: 0.8rem; font-weight: 600; border: 1px solid var(--border-light); color: var(--text-muted); }
+        .tag.b1 { background: #e0e7ff; color: #4338ca; border: none; }
+
+        .word-display { font-size: 4rem; font-weight: 800; color: #1a1a1a; letter-spacing: -1px; }
+        .meaning-display { font-size: 2rem; font-weight: 700; color: var(--primary); text-align: center; }
+        .example-display { font-size: 1.1rem; color: var(--text-muted); text-align: center; margin-top: 1rem; }
+
+        .flip-btn {
+            width: 100%; background: #1e293b; color: white; padding: 1.2rem;
+            border-radius: 12px; font-size: 1.1rem; font-weight: 700; border: none; cursor: pointer;
+            display: flex; justify-content: center; align-items: center; gap: 8px; transition: background 0.3s;
+        }
+        .flip-btn:hover { background: #0f172a; }
+
+        /* --- Features Section --- */
+        .features { padding: 8rem 5%; background: white; }
+        .section-title { text-align: center; font-size: 2.5rem; font-weight: 800; margin-bottom: 4rem; }
+
+        .feature-row { display: flex; align-items: center; gap: 5rem; margin-bottom: 8rem; max-width: 1100px; margin-inline: auto; }
+        .feature-row.reverse { flex-direction: row-reverse; }
+        .feature-text { flex: 1; }
+        .feature-text h3 { font-size: 2.2rem; margin-bottom: 1rem; font-weight: 800; }
+        .feature-text p { font-size: 1.15rem; color: var(--text-muted); line-height: 1.8; }
+        
+        .feature-visual { flex: 1.2; background: rgba(248, 250, 252, 0.6); backdrop-filter: blur(20px); border-radius: 24px; padding: 2rem; border: 1px solid rgba(255, 255, 255, 0.8); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05); position: relative; overflow: visible; }
+
+        /* --- Story Reader --- */
+        .app-story { display: flex; gap: 1rem; height: 350px; position: relative; }
+        .story-sidebar { width: 100px; background: rgba(255,255,255,0.8); border-radius: 12px; border: 1px solid var(--border-light); padding: 1rem; display: flex; flex-direction: column; gap: 10px;}
+        .sidebar-item { height: 30px; background: #e2e8f0; border-radius: 6px; width: 100%; }
+        .sidebar-item.active { background: #f3e8ff; border: 1px solid #d8b4fe; }
+        
+        .story-content { flex: 1; background: rgba(255,255,255,0.9); border-radius: 12px; border: 1px solid var(--border-light); padding: 1.5rem; position: relative;}
+        .story-top { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); padding-bottom: 1rem; margin-bottom: 1rem;}
+        .story-title { font-weight: 700; font-size: 1rem; }
+        .story-text { font-size: 1rem; line-height: 2.2; color: var(--text-dark); text-align: left; direction: ltr; font-family: sans-serif; }
+        
+        .word-wrapper { position: relative; display: inline-block; }
+        .hover-word { background: #f3e8ff; border-bottom: 2px solid var(--primary); padding: 0 4px; border-radius: 4px; color: var(--primary); font-weight: 600; cursor: pointer; }
+        
+        .word-popup {
+            position: absolute; top: 140%; left: 50%; transform: translateX(-50%);
+            background: white; border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            border: 1px solid var(--border-light); padding: 1rem; width: 220px; z-index: 100;
+            display: flex; flex-direction: column; gap: 10px; direction: rtl; text-align: right;
+        }
+        .word-popup::before { content: ''; position: absolute; top: -6px; left: 50%; transform: translateX(-50%) rotate(45deg); width: 12px; height: 12px; background: white; border-left: 1px solid var(--border-light); border-top: 1px solid var(--border-light); }
+
+        .popup-header { display: flex; justify-content: space-between; font-weight: 700; font-size: 1.1rem; }
+        .popup-trans { font-size: 0.9rem; color: var(--text-muted); background: var(--bg-main); padding: 0.6rem; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0;}
+        .popup-btn { background: var(--primary); color: white; border: none; padding: 0.7rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px;}
+
+        /* --- AI Generation --- */
+        .app-ai { background: rgba(255,255,255,0.9); border-radius: 16px; border: 1px solid var(--border-light); padding: 1.5rem; }
+        .ai-header { display: flex; justify-content: space-between; margin-bottom: 1rem; }
+        .ai-badge { background: #f0fdf4; color: #16a34a; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 4px;}
+        .ai-input-area { background: var(--bg-main); border: 1px solid var(--border-light); border-radius: 12px; height: 120px; padding: 1rem; color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;}
+        .ai-footer { display: flex; justify-content: space-between; align-items: center; }
+        .ai-options { display: flex; gap: 8px; }
+        .ai-option { background: var(--bg-main); border: 1px solid var(--border-light); padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.8rem; font-weight: 600; color: var(--text-muted);}
+        .ai-option.active { background: #f3e8ff; color: var(--primary); border-color: #d8b4fe; }
+        .ai-gen-btn { background: var(--primary); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer;}
+
+        /* --- White Language Menu --- */
+        .lang-feature-container { display: flex; justify-content: center; align-items: center; width: 100%; min-height: 250px; }
+        .white-lang-menu { background: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); border: 1px solid var(--border-light); width: 220px; overflow: hidden; display: flex; flex-direction: column; }
+        .lang-menu-header { background: var(--bg-main); padding: 0.8rem 1rem; font-weight: 600; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); }
+        .white-lang-item { padding: 0.7rem 1rem; font-size: 0.95rem; color: var(--text-dark); border-bottom: 1px solid var(--bg-main); display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
+        .white-lang-item:hover { background: var(--bg-main); }
+        .white-lang-item.active { background: var(--primary-light); color: var(--primary); font-weight: 600; border-right: 4px solid var(--primary); }
+        body[dir="ltr"] .white-lang-item.active { border-right: none; border-left: 4px solid var(--primary); }
+
+        /* --- FAQ Section (جديد) --- */
+        .faq-section { padding: 6rem 5%; background: var(--bg-main); }
+        .faq-container { max-width: 800px; margin: 0 auto; }
+        .faq-item { background: white; border: 1px solid var(--border-light); border-radius: 12px; margin-bottom: 1rem; overflow: hidden; box-shadow: var(--shadow-soft); }
+        .faq-item summary { padding: 1.5rem; font-weight: 700; font-size: 1.1rem; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; outline: none; }
+        .faq-item summary::-webkit-details-marker { display: none; }
+        .faq-item summary::after { content: '+'; font-size: 1.5rem; color: var(--primary); font-weight: 400; transition: transform 0.3s; }
+        .faq-item[open] summary::after { transform: rotate(45deg); }
+        .faq-item p { padding: 0 1.5rem 1.5rem; color: var(--text-muted); line-height: 1.8; }
+
+        /* --- Dedicated Download Section --- */
+        .download-section { padding: 6rem 5%; background: white; text-align: center; }
+        .download-container { max-width: 1000px; margin: 0 auto; background: var(--bg-main); border-radius: 24px; padding: 3rem; box-shadow: var(--shadow-soft); border: 1px solid var(--border-light); }
+        .download-container h2 { font-size: 2.2rem; margin-bottom: 1rem; font-weight: 800; }
+        .download-container p { color: var(--text-muted); margin-bottom: 3rem; font-size: 1.1rem; }
+        
+        .download-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; }
+        .download-card { background: white; border: 1px solid var(--border-light); border-radius: 16px; padding: 2rem 1rem; display: flex; flex-direction: column; align-items: center; gap: 1rem; transition: all 0.3s; text-decoration: none; color: inherit; position: relative; }
+        .download-card.clickable { cursor: pointer; }
+        .download-card.clickable:hover { border-color: var(--primary); transform: translateY(-5px); box-shadow: 0 10px 20px rgba(124, 58, 237, 0.15); }
+        
+        .download-card.disabled { opacity: 0.8; cursor: not-allowed; background: #f8fafc; }
+        .download-card.disabled:hover { transform: none; box-shadow: none; border-color: var(--border-light); }
+        .download-card .badge-soon { position: absolute; top: -10px; background: #22c55e; color: white; padding: 0.2rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; box-shadow: 0 4px 10px rgba(34, 197, 94, 0.3); }
+
+        .download-card img.os-icon { width: 40px; height: 40px; object-fit: contain; transition: transform 0.3s; }
+        .download-card.clickable:hover img.os-icon { transform: scale(1.1); }
+        .download-card h4 { font-size: 1.2rem; font-weight: 700; }
+        .download-card span { font-size: 0.9rem; color: var(--text-muted); }
+        
+        .download-note { margin-top: 2rem; font-size: 0.95rem; color: var(--text-muted); display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap;}
+        .download-note a { color: var(--primary); text-decoration: underline; font-weight: 600; transition: color 0.2s; }
+        .download-note a:hover { color: var(--primary-hover); }
+
+        /* --- Privacy Section --- */
+        .privacy { padding: 6rem 5%; background: #1e293b; color: white; text-align: center; }
+        .privacy-icon { font-size: 4rem; color: var(--primary); margin-bottom: 1rem; }
+        .privacy h2 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; }
+        .privacy p { font-size: 1.2rem; max-width: 700px; margin: 0 auto; color: #cbd5e1; }
+
+        /* --- Footer --- */
+        footer { background: white; padding: 4rem 5% 2rem; border-top: 1px solid var(--border-light); }
+        .footer-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 2rem; margin-bottom: 2rem; }
+        .footer-links { display: flex; gap: 2rem; font-weight: 500; color: var(--text-muted); }
+        .footer-bottom { text-align: center; color: var(--text-muted); padding-top: 2rem; border-top: 1px solid var(--border-light); font-size: 0.9rem; }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .feature-row, .feature-row.reverse { flex-direction: column; text-align: center; gap: 3rem; }
+            .nav-links a.nav-link { display: none; }
+            .hero h1 { font-size: 2.5rem; }
+            .flashcard-scene { height: 350px; }
+            .word-display { font-size: 3rem; }
+            .app-story { flex-direction: column; height: auto; }
+            .story-sidebar { display: none; }
+            .word-popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 90%; }
+            .word-popup::before { display: none; }
+        }
+        
+        /* Scroll Animations */
+        .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+        .reveal.active { opacity: 1; transform: translateY(0); }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <nav>
+        <a href="#" class="logo-container">
+            <div class="logo-text">
+                <span class="flash">flash</span><span class="ki">ki</span>
+            </div>
+            <div class="logo-icon">
+                <div class="logo-bg-orange"></div>
+                <div class="logo-bg-blue">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="4" y="4" width="14" height="14" rx="3" stroke="white" stroke-width="2"/>
+                        <rect x="9" y="9" width="11" height="11" rx="2" fill="#1e3a8a" stroke="white" stroke-width="2"/>
+                    </svg>
+                </div>
+            </div>
+        </a>
+        
+        <div class="nav-links">
+            <a href="#features" class="nav-link" data-ar="المميزات" data-en="Features">المميزات</a>
+            <a href="#faq" class="nav-link" data-ar="الأسئلة الشائعة" data-en="FAQ">الأسئلة الشائعة</a>
+            <a href="#download" class="nav-link" data-ar="التحميل" data-en="Download">التحميل</a>
+            <a href="#privacy" class="nav-link" data-ar="الخصوصية" data-en="Privacy">الخصوصية</a>
+            
+            <button class="lang-toggle" onclick="toggleLang()">
+                <i class="ph ph-translate"></i> <span id="langText">EN</span>
+            </button>
+            
+            <a href="#download" class="btn-nav-download">
+                <i class="ph ph-download-simple"></i> <span data-ar="تحميل التطبيق" data-en="Download App">تحميل التطبيق</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-badges reveal">
+            <div class="badge desktop"><i class="ph ph-desktop"></i> <span data-ar="تطبيق سطح المكتب" data-en="Desktop App">تطبيق سطح المكتب</span></div>
+            <div class="badge android"><i class="ph ph-android-logo"></i> <span data-ar="أندرويد قريباً" data-en="Android Soon">أندرويد قريباً</span></div>
+        </div>
+        
+        <h1 class="reveal" data-ar="تعلّم اللغات باحترافية. <br> <span>بخصوصية تامة.</span>" data-en="Learn Languages Professionally. <br> <span>With Absolute Privacy.</span>">
+            تعلّم اللغات باحترافية. <br> <span>بخصوصية تامة.</span>
+        </h1>
+        <p class="reveal" data-ar="تطبيق متكامل، سريع، وآمن 100%. يحوّل أي نص إلى بطاقات وقصص تفاعلية مدعومة بالذكاء الاصطناعي، دون الحاجة لأي حسابات أو سحابة." data-en="A complete, fast, and 100% secure app. Turns any text into interactive flashcards and stories powered by AI, with no accounts or cloud needed.">
+            تطبيق متكامل، سريع، وآمن 100%. يحوّل أي نص إلى بطاقات وقصص تفاعلية مدعومة بالذكاء الاصطناعي، دون الحاجة لأي حسابات أو سحابة.
+        </p>
+        
+        <div class="hero-buttons reveal">
+            <a href="#download" class="btn-primary">
+                <i class="ph ph-download-simple"></i> <span data-ar="تحميل التطبيق الآن" data-en="Download App Now">تحميل التطبيق الآن</span>
+            </a>
+        </div>
+
+        <!-- 3D Flip Flashcard Mockup -->
+        <div class="mockup-wrapper reveal">
+            <div class="flashcard-scene">
+                <div class="flashcard" id="myCard">
+                    <!-- Front -->
+                    <div class="card-face card-front">
+                        <div class="app-header">
+                            <div class="speaker-btn"><i class="ph ph-speaker-high"></i></div>
+                            <div class="tags">
+                                <span class="tag">story</span>
+                                <span class="tag b1">B1</span>
+                            </div>
+                        </div>
+                        
+                        <div class="word-display">unterstützen</div>
+                        
+                        <button class="flip-btn" onclick="flipCard(event)">
+                            <span data-ar="اقلب البطاقة" data-en="Flip Card">اقلب البطاقة</span> <i class="ph ph-arrows-clockwise"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Back -->
+                    <div class="card-face card-back">
+                        <div class="app-header">
+                            <div class="speaker-btn" style="color: #16a34a;"><i class="ph ph-check-circle"></i></div>
+                            <div class="tags">
+                                <span class="tag" style="background: #f0fdf4; color: #16a34a;">Saved</span>
+                            </div>
+                        </div>
+                        
+                        <div class="meaning-display">
+                            <span data-ar="يدعم / يساند" data-en="Supports / Assists">يدعم / يساند</span>
+                            <div class="example-display">Herr Becker unterstützt ihn.<br><span style="color: var(--primary);" data-ar="السيد بيكر يدعمه." data-en="Mr. Becker supports him.">السيد بيكر يدعمه.</span></div>
+                        </div>
+                        
+                        <button class="flip-btn" onclick="flipCard(event)">
+                            <span data-ar="إعادة" data-en="Reset">إعادة</span> <i class="ph ph-arrow-u-up-left"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <h2 class="section-title reveal" data-ar="صُمم ليمنحك الأفضل" data-en="Designed to give you the best">صُمم ليمنحك الأفضل</h2>
+
+        <!-- Feature 1: Story Reader -->
+        <div class="feature-row reveal">
+            <div class="feature-text">
+                <h3 data-ar="اقرأ القصص بسلاسة" data-en="Read Stories Smoothly">اقرأ القصص بسلاسة</h3>
+                <p data-ar="ترجمة فورية، نطق بشري، وواجهة نظيفة. اضغط على أي كلمة لمعرفة معناها، وحوّلها إلى بطاقة بضغطة واحدة دون مغادرة الصفحة." data-en="Instant translation, human-like speech, and a clean interface. Click any word to see its meaning, and turn it into a flashcard with one click without leaving the page.">ترجمة فورية، نطق بشري، وواجهة نظيفة. اضغط على أي كلمة لمعرفة معناها، وحوّلها إلى بطاقة بضغطة واحدة دون مغادرة الصفحة.</p>
+            </div>
+            <div class="feature-visual">
+                <div class="app-story">
+                    <div class="story-sidebar">
+                        <div class="sidebar-item active"></div>
+                        <div class="sidebar-item"></div>
+                        <div class="sidebar-item"></div>
+                    </div>
+                    <div class="story-content">
+                        <div class="story-top">
+                            <span class="story-title">Ein neuer Weg</span>
+                            <span style="font-size: 0.8rem; color: var(--text-muted);">B1</span>
+                        </div>
+                        <div class="story-text">
+                            Als Tareq vor zwei Jahren nach Deutschland kam, wusste er noch nicht genau, wie seine berufliche Zukunft aussehen würde. Nach dem Sprachkurs 
+                            
+                            <div class="word-wrapper">
+                                <span class="hover-word">entschied</span>
+                                <div class="word-popup">
+                                    <div class="popup-header">
+                                        <span>entschied</span>
+                                        <i class="ph ph-x" style="color: var(--text-muted); cursor: pointer;"></i>
+                                    </div>
+                                    <div class="popup-trans">
+                                        <strong data-ar="الترجمة:" data-en="Meaning:">الترجمة:</strong> 
+                                        <span data-ar="قرر (فعل)" data-en="decided (verb)">قرر (فعل)</span>
+                                    </div>
+                                    <button class="popup-btn">
+                                        <i class="ph ph-lightning"></i> <span data-ar="تحويل إلى بطاقة" data-en="Convert to Card">تحويل إلى بطاقة</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            er sich für ein duales System.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 2: AI Generation -->
+        <div class="feature-row reverse reveal">
+            <div class="feature-text">
+                <h3 data-ar="ذكاء اصطناعي يبني بطاقاتك" data-en="AI Builds Your Cards">ذكاء اصطناعي يبني بطاقاتك</h3>
+                <p data-ar="الصق أي نص طويل، وسيقوم Gemini باستخراج الكلمات المهمة، وترجمتها، ووضع أمثلة سياقية لها، وتوليد بطاقات احترافية في ثوانٍ." data-en="Paste any long text, and Gemini will extract key words, translate them, provide contextual examples, and generate professional flashcards in seconds.">الصق أي نص طويل، وسيقوم Gemini باستخراج الكلمات المهمة، وترجمتها، ووضع أمثلة سياقية لها، وتوليد بطاقات احترافية في ثوانٍ.</p>
+            </div>
+            <div class="feature-visual">
+                <div class="app-ai">
+                    <div class="ai-header">
+                        <div style="font-weight: 700; font-size: 0.9rem;"><i class="ph ph-sparkle" style="color: var(--primary);"></i> <span data-ar="إدخال بالذكاء الاصطناعي" data-en="AI Input">إدخال بالذكاء الاصطناعي</span></div>
+                        <div class="ai-badge"><i class="ph ph-check-circle"></i> Gemini</div>
+                    </div>
+                    <div class="ai-input-area">
+                        <span data-ar="الصق نصاً طويلاً – سيستخرج الذكاء الاصطناعي الكلمات الأحدى ويحولها إلى بطاقات..." data-en="Paste long text - AI will extract key words and convert them to cards...">الصق نصاً طويلاً – سيستخرج الذكاء الاصطناعي الكلمات الأحدى ويحولها إلى بطاقات...</span>
+                    </div>
+                    <div class="ai-footer">
+                        <div class="ai-options">
+                            <div class="ai-option" data-ar="5 بطاقات" data-en="5 Cards">5 بطاقات</div>
+                            <div class="ai-option active" data-ar="10 بطاقات" data-en="10 Cards">10 بطاقات</div>
+                        </div>
+                        <button class="ai-gen-btn">
+                            <i class="ph ph-magic-wand"></i> <span data-ar="توليد" data-en="Generate">توليد</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 3: White Language Menu -->
+        <div class="feature-row reveal">
+            <div class="feature-text">
+                <h3 data-ar="واجهة تتحدث لغتك" data-en="An Interface That Speaks Your Language">واجهة تتحدث لغتك</h3>
+                <p data-ar="Flashki يدعم 8 لغات كاملة (RTL و LTR) لتجربة تعلم سلسة. اختر لغتك المفضلة وابدأ فوراً." data-en="Flashki supports 8 full languages (RTL & LTR) for a seamless learning experience. Choose your favorite language and start immediately.">Flashki يدعم 8 لغات كاملة (RTL و LTR) لتجربة تعلم سلسة. اختر لغتك المفضلة وابدأ فوراً.</p>
+            </div>
+            <div class="feature-visual lang-feature-container">
+                <div class="white-lang-menu">
+                    <div class="lang-menu-header">
+                        <span data-ar="اختر اللغة" data-en="Select Language">اختر اللغة</span>
+                        <i class="ph ph-caret-down"></i>
+                    </div>
+                    <div class="white-lang-item active">
+                        <span>العربية</span> <i class="ph ph-check"></i>
+                    </div>
+                    <div class="white-lang-item">
+                        <span>English</span>
+                    </div>
+                    <div class="white-lang-item">
+                        <span>Deutsch</span>
+                    </div>
+                    <div class="white-lang-item">
+                        <span>Español</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section id="faq" class="faq-section">
+        <div class="faq-container">
+            <h2 class="section-title reveal" data-ar="الأسئلة الشائعة" data-en="Frequently Asked Questions">الأسئلة الشائعة</h2>
+            
+            <details class="faq-item reveal">
+                <summary data-ar="هل التطبيق مجاني بالكامل؟" data-en="Is the app completely free?">هل التطبيق مجاني بالكامل؟</summary>
+                <p data-ar="نعم، Flashki مفتوح المصدر ومجاني بالكامل. لا توجد اشتراكات خفية أو رسوم إجبارية. أنت تتحكم في بياناتك وتستخدم التطبيق محلياً 100%." data-en="Yes, Flashki is open-source and completely free. There are no hidden subscriptions or forced fees. You control your data and use the app 100% locally.">نعم، Flashki مفتوح المصدر ومجاني بالكامل. لا توجد اشتراكات خفية أو رسوم إجبارية. أنت تتحكم في بياناتك وتستخدم التطبيق محلياً 100%.</p>
+            </details>
+
+            <details class="faq-item reveal">
+                <summary data-ar="هل يحتاج التطبيق إلى اتصال بالإنترنت؟" data-en="Does the app require an internet connection?">هل يحتاج التطبيق إلى اتصال بالإنترنت؟</summary>
+                <p data-ar="التطبيق يعمل محلياً بالكامل (Offline) لمراجعة البطاقات وقراءة القصص. تحتاج للإنترنت فقط إذا أردت استخدام ميزات الذكاء الاصطناعي (لتوليد القصص أو ترجمة الكلمات) أو لتشغيل النطق الصوتي عبر Edge TTS." data-en="The app works fully offline for reviewing flashcards and reading stories. You only need the internet if you want to use AI features (to generate stories or translate words) or to use Edge TTS voice.">التطبيق يعمل محلياً بالكامل (Offline) لمراجعة البطاقات وقراءة القصص. تحتاج للإنترنت فقط إذا أردت استخدام ميزات الذكاء الاصطناعي (لتوليد القصص أو ترجمة الكلمات) أو لتشغيل النطق الصوتي عبر Edge TTS.</p>
+            </details>
+
+            <details class="faq-item reveal">
+                <summary data-ar="أين يتم حفظ بياناتي وبياناتي؟" data-en="Where is my data stored?">أين يتم حفظ بياناتي؟</summary>
+                <p data-ar="جميع بياناتك (البطاقات، القصص، الإعدادات) يتم حفظها في قاعدة بيانات محلية (SQLite) على جهازك فقط. لا نقوم برفعها إلى أي سحابة، مما يضمن خصوصيتك المطلقة وسرعة فائقة." data-en="All your data (flashcards, stories, settings) is stored in a local database (SQLite) on your device only. We don't upload it to any cloud, ensuring your absolute privacy and high speed.">جميع بياناتك (البطاقات، القصص، الإعدادات) يتم حفظها في قاعدة بيانات محلية (SQLite) على جهازك فقط. لا نقوم برفعها إلى أي سحابة، مما يضمن خصوصيتك المطلقة وسرعة فائقة.</p>
+            </details>
+
+            <details class="faq-item reveal">
+                <summary data-ar="متى سيتوفر تطبيق الأندرويد؟" data-en="When will the Android app be available?">متى سيتوفر تطبيق الأندرويد؟</summary>
+                <p data-ar="نعمل حالياً على تطوير نسخة الأندرويد باستخدام إطار عمل Tauri 2. ترقبوا التحديثات القادمة على صفحة مستودع GitHub الخاص بنا." data-en="We are currently working on the Android version using Tauri 2. Stay tuned for upcoming updates on our GitHub repository page.">نعمل حالياً على تطوير نسخة الأندرويد باستخدام إطار عمل Tauri 2. ترقبوا التحديثات القادمة على صفحة مستودع GitHub الخاص بنا.</p>
+            </details>
+        </div>
+    </section>
+
+    <!-- Dedicated Download Section -->
+    <section id="download" class="download-section reveal">
+        <div class="download-container">
+            <h2 data-ar="حمّل التطبيق الآن" data-en="Download the App Now">حمّل التطبيق الآن</h2>
+            <p data-ar="اختر نظام التشغيل الخاص بك لبدء رحلة التعلم. التطبيق يعمل محلياً بالكامل." data-en="Choose your operating system to start your learning journey. The app works fully locally.">اختر نظام التشغيل الخاص بك لبدء رحلة التعلم. التطبيق يعمل محلياً بالكامل.</p>
+            
+            <div class="download-grid">
+                <!-- Windows (Devicon) -->
+                <a href="https://github.com/7amzalam/flashki/releases/download/v1.1.0/Flashki_1.1.0_x64-setup.exe" target="_blank" class="download-card clickable">
+                    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/windows11/windows11-original.svg" alt="Windows" class="os-icon">
+                    <h4>Windows</h4>
+                    <span>.exe</span>
+                </a>
+                
+                <!-- Debian (Devicon) -->
+                <a href="https://github.com/7amzalam/flashki/releases/download/v1.1.0/Flashki_1.1.0_amd64.deb" target="_blank" class="download-card clickable">
+                    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/linux/linux-original.svg" alt="Linux" class="os-icon">
+                    <h4>Linux (Debian)</h4>
+                    <span>.deb</span>
+                </a>
+
+                <!-- AppImage (Devicon) -->
+                <a href="https://github.com/7amzalam/flashki/releases/download/v1.1.0/Flashki_1.1.0_amd64.AppImage" target="_blank" class="download-card clickable">
+                    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/linux/linux-original.svg" alt="Linux" class="os-icon">
+                    <h4>Linux (AppImage)</h4>
+                    <span>.AppImage</span>
+                </a>
+
+                <!-- Android (Devicon) -->
+                <div class="download-card disabled">
+                    <div class="badge-soon" data-ar="قريباً" data-en="Soon">قريباً</div>
+                    <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/android/android-original.svg" alt="Android" class="os-icon">
+                    <h4>Android</h4>
+                    <span>.apk</span>
+                </div>
+            </div>
+            
+            <div class="download-note">
+                <i class="ph ph-info"></i> 
+                <span data-ar="جميع الإصدارات متاحة على " data-en="All versions are available on ">جميع الإصدارات متاحة على </span>
+                <a href="https://github.com/7amzalam/flashki/releases" target="_blank" data-ar="صفحة GitHub Releases" data-en="GitHub Releases page">صفحة GitHub Releases</a>.
+            </div>
+        </div>
+    </section>
+
+    <!-- Privacy Section -->
+    <section id="privacy" class="privacy reveal">
+        <i class="ph ph-shield-check privacy-icon"></i>
+        <h2 data-ar="بياناتك ملكك وحدك" data-en="Your data is yours alone">بياناتك ملكك وحدك</h2>
+        <p data-ar="لا سحابة، لا حسابات، لا تتبع. قاعدة بياناتك محفوظة محلياً على جهازك لتضمن السرعة القصوى والأمان التام. حتى مفتاح الذكاء الاصطناعي الخاص بك لا يغادر جهازك." data-en="No cloud, no accounts, no tracking. Your database is stored locally on your device for maximum speed and absolute security. Even your AI key never leaves your device.">لا سحابة، لا حسابات، لا تتبع. قاعدة بياناتك محفوظة محلياً على جهازك لتضمن السرعة القصوى والأمان التام. حتى مفتاح الذكاء الاصطناعي الخاص بك لا يغادر جهازك.</p>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <a href="#" class="logo-container">
+                <div class="logo-text" style="font-size: 1.4rem;">
+                    <span class="flash">flash</span><span class="ki">ki</span>
+                </div>
+                <div class="logo-icon" style="transform: scale(0.8);">
+                    <div class="logo-bg-orange"></div>
+                    <div class="logo-bg-blue">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="4" y="4" width="14" height="14" rx="3" stroke="white" stroke-width="2"/>
+                            <rect x="9" y="9" width="11" height="11" rx="2" fill="#1e3a8a" stroke="white" stroke-width="2"/>
+                        </svg>
+                    </div>
+                </div>
+            </a>
+            <div class="footer-links">
+                <a href="https://github.com/7amzalam/flashki" target="_blank">GitHub</a>
+                <a href="https://github.com/7amzalam/flashki/releases" target="_blank">Releases</a>
+                <a href="https://github.com/7amzalam/flashki/blob/main/LICENSE" target="_blank">License</a>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <span data-ar="صُنع بشغف لدعم تعلم اللغات. © 2026 Flashki." data-en="Built with passion for language learning. © 2026 Flashki.">صُنع بشغف لدعم تعلم اللغات. © 2026 Flashki.</span>
+        </div>
+    </footer>
+
+    <script>
+        // 3D Card Flip Logic
+        function flipCard(event) {
+            event.stopPropagation(); 
+            const card = document.getElementById('myCard');
+            card.classList.toggle('flipped');
+        }
+
+        // Language Toggle Logic (RTL <-> LTR)
+        let currentLang = 'ar';
+
+        function toggleLang() {
+            const body = document.body;
+            const elements = document.querySelectorAll('[data-ar]');
+            const btnText = document.getElementById('langText');
+
+            if (currentLang === 'ar') {
+                currentLang = 'en';
+                body.setAttribute('dir', 'ltr');
+                body.setAttribute('lang', 'en');
+                btnText.innerText = 'AR';
+            } else {
+                currentLang = 'ar';
+                body.setAttribute('dir', 'rtl');
+                body.setAttribute('lang', 'ar');
+                btnText.innerText = 'EN';
+            }
+
+            elements.forEach(el => {
+                const text = el.getAttribute(`data-${currentLang}`);
+                if (text) {
+                    el.innerHTML = text;
+                }
+            });
+        }
+
+        // Scroll Reveal Animation
+        function reveal() {
+            var reveals = document.querySelectorAll(".reveal");
+            for (var i = 0; i < reveals.length; i++) {
+                var windowHeight = window.innerHeight;
+                var elementTop = reveals[i].getBoundingClientRect().top;
+                var elementVisible = 100;
+                if (elementTop < windowHeight - elementVisible) {
+                    reveals[i].classList.add("active");
+                }
+            }
+        }
+
+        window.addEventListener("scroll", reveal);
+        reveal();
+
+        // سكربت التمرير السلس الدقيق
+        document.querySelectorAll('.nav-link, .hero-buttons a[href^="#"], .btn-nav-download').forEach(link => {
+            link.addEventListener('click', function(e) {
+                if(this.getAttribute('href').startsWith('http')) return;
+                
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                const targetElement = document.querySelector(targetId);
+                
+                if (targetElement) {
+                    const headerOffset = 80;
+                    const elementPosition = targetElement.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: "smooth"
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
