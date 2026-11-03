@@ -1,8 +1,18 @@
 # Flashki — Smart Flashcards & Interactive Stories (Tauri 2 + SQLite)
 
 <p align="center">
-  <img src="app-icon.png" width="128" height="128" alt="Flashki Logo" />
+  <a href="https://7amzalam.github.io/flashki/">
+    <img src="app-icon.png" width="128" height="128" alt="Flashki Logo" />
+  </a>
 </p>
+
+<p align="center">
+  <a href="https://7amzalam.github.io/flashki/">
+    <img src="https://img.shields.io/badge/🌐_Visit_Website_&_Download-7c3aed?style=for-the-badge&logoColor=white" alt="Visit Website" />
+  </a>
+</p>
+
+
 
 A complete open-source desktop app for language learning and vocabulary memorization built on **Spaced Repetition (SM-2)**, plus **AI-powered interactive stories (Google Gemini)** — with 100% safe and fast local storage via a **SQLite** database and high-quality natural text-to-speech through **Edge TTS**.
 
