@@ -8,9 +8,9 @@
   var DAY = 86400000, MIN = 60000;
 
   var DEFAULT_SETTINGS = {
-    lang: 'ar', theme: 'dark', fontSize: 0, animations: true,
+    lang: 'ar', theme: 'light', fontSize: 0, animations: true,
     apiKey: '', model: 'gemini-3.6-flash', keyStatus: 'unchecked',
-    ttsRate: 1, autoTts: true,
+    ttsRate: 1, ttsRateNative: 1, autoTts: true,
     autoTwoSided: true, dailyNew: 20, aiCount: 'auto',
     cefrLevel: 'B1', translationAutoEnabled: true,
     /* صوت افتراضي لكل لغة (Edge TTS — تحقق حي) */
@@ -216,7 +216,8 @@
   function wipeAll() {
     return App.db.clear('decks').then(function () { return App.db.clear('cards'); })
       .then(function () { return App.db.clear('reviews'); })
-      .then(function () { return App.db.clear('kv'); });
+      .then(function () { return App.db.clear('kv'); })
+      .then(function () { return App.db.audioCacheClear ? App.db.audioCacheClear() : null; }); /* كاش الأصوات المولدة أيضاً */
   }
 
   /* ⚠️ حُذفت بذور التشغيل الأول نهائياً (كانت 4 أقسام + 20 بطاقة وهمية).

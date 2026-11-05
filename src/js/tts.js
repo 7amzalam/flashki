@@ -1,12 +1,24 @@
 /* Flashki — tts.js : النطق بكشف تلقائي للغة
-   ─ محرك أساسي: Microsoft Edge TTS (WebSocket + Sec-MS-GEC/BigInt) — MP3 يُشغَّل فوراً
-   ─ fallback: Web Speech API عند فشل Edge (متصفح بلا شبكة مثلاً)
+   ─ ترتيب المحركات (الافتراضي auto): صوت مايكروسوفت Edge TTS على كل الأجهزة بما فيها
+     الهاتف (WebSocket + Sec-MS-GEC بلا BigInt — توافق مع WebView القديم v1.7.2).
+     عند تعذره (بلا شبكة) → Google TTS → نطق المتصفح. إعداد 'phone' يبدأ بأصوات
+     الهاتف عكسياً (اختياري من الإعدادات لمن يريد النطق المحلي دون إنترنت).
+   ─ MP3 من مايكروسوفت يُشغَّل فوراً ويُخزَّن في الكاش
    ─ ترتيب تحديد اللغة: cards.lang → كشف Unicode → سياق الوجه (أمامي=target، خلفي=native)
    ─ صوت كل لغة محفوظ في settings: tts_voice_ar / tts_voice_en / … */
 (function () {
   'use strict';
   var App = window.App = window.App || {};
   var U = App.util;
+
+  /* توافقية WebView قديم جداً (< 48): Math.imul مطلوبة في cs64 — بوليفل قياسي MDN */
+  if (typeof Math.imul !== 'function') {
+    Math.imul = function (a, b) {
+      var ah = (a >>> 16) & 0xffff, al = a & 0xffff;
+      var bh = (b >>> 16) & 0xffff, bl = b & 0xffff;
+      return ((al * bl) + (((ah * bl + al * bh) << 16) >>> 0) | 0);
+    };
+  }
 
   var TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
   var GEC_VERSION = '2-143.0.3650.75';
@@ -134,12 +146,15 @@
       .map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('').toUpperCase();
   }
 
-  /* ── التوكن v2: ticks مقربة لـ5 دقائق × 10^7 + token ── */
+  /* ── التوكن v2: ticks مقربة لـ5 دقائق × 10^7 + token ──
+     بلا BigInt — أرقام n تعطل تحليل الملف كله في WebView القديم على أندرويد
+     (Chromium < 67) فصمت زر الاستماع كلياً. الحساب المكافئ تماماً بأعداد عادية:
+     base = ثانية يونكس + 11644473600 (≈1.34e10 < 2^53 → صحيح دقيق)، تقريب لأسفل
+     لمضاعف 300، ثم ×10^7 = إلحاق 7 أصفار في النظام العشري (مضبوطة لا تقريب). */
   function genGec() {
-    var ticks = (BigInt(Date.now()) / 1000n + 11644473600n);
-    ticks = ticks - (ticks % 300n);
-    ticks = ticks * 10000000n;
-    var str = ticks.toString() + TOKEN;
+    var base = Math.floor(Date.now() / 1000) + 11644473600;
+    base = base - (base % 300);
+    var str = String(base) + '0000000' + TOKEN;
     var bytes = [];
     for (var i = 0; i < str.length; i++) bytes.push(str.charCodeAt(i));
     var digest = sha256Var(bytes);
@@ -190,6 +205,66 @@
   /* ═════════ محرك Edge TTS (WebSocket → MP3) ═════════ */
   var edgeAudio = null;
 
+  /* ─── أندرويد: تفضيل أصوات الهاتف الحقيقية (أوفلاين) حسب إعداد المستخدم ─── */
+  var IS_ANDROID = !!(window.FlashkiAndroid && typeof window.FlashkiAndroid.ttsSynthesize === 'function');
+
+  /* لغات نطق الهاتف المتاحة — تُجلب مرة واحدة عند الإقلاع (ttsInfo) */
+  var nativeInfo = { ready: null, langs: null, voices: 0 };
+  function fetchNativeInfo() {
+    if (!IS_ANDROID || nativeInfo.ready !== null) return;
+    try {
+      var raw = window.FlashkiAndroid.ttsInfo();
+      var d = JSON.parse(raw);
+      nativeInfo.ready = !!d.ready;
+      nativeInfo.langs = d.langs || [];
+      nativeInfo.voices = d.voices || 0;
+    } catch (e) { nativeInfo.ready = false; }
+  }
+  /* هل يغطي نطق الهاتف هذه اللغة؟ — ready=null يعني لم تُجلب المعلومة بعد فنجرّب عمياء */
+  function nativeCovers(langCode) {
+    if (nativeInfo.langs === null || !nativeInfo.langs.length) return true; /* لا معلومة → جرّب */
+    return nativeInfo.langs.indexOf(String(langCode || '').toLowerCase()) >= 0;
+  }
+  function enginePref() {
+    var e = App.state.settings && App.state.settings.ttsEngine;
+    return (e === 'phone' || e === 'edge') ? e : 'auto';
+  }
+
+  /* النطق المباشر عبر محرك الهاتف — تشغيل فوري بلا ملف ولا كاش.
+     العقد مع الأصل: __fkNativeSpeakDone(cbId, phase) بـ phase = start|end|error */
+  var directPending = {};
+  var directSeq = 0;
+  function nativeSpeakDirect(text, voice) {
+    return new Promise(function (resolve, reject) {
+      try {
+        if (!(window.FlashkiAndroid && typeof window.FlashkiAndroid.ttsSpeakDirect === 'function')) return reject(new Error('no bridge'));
+        var id = 'd' + (++directSeq);
+        directPending[id] = { resolve: resolve, reject: reject, started: false };
+        window.FlashkiAndroid.ttsSpeakDirect(String(text), voice || '', ratePct(voice), id);
+        setTimeout(function () {
+          if (directPending[id]) {
+            var p = directPending[id];
+            delete directPending[id];
+            notify('end');
+            p.resolve(); /* انتهى أو علق — لا نحجب الواجهة */
+          }
+        }, 120000);
+      } catch (e) { reject(e); }
+    });
+  }
+  window.__fkNativeSpeakDone = function (id, phase) {
+    var p = directPending[id];
+    if (!p) return;
+    if (phase === 'start') {
+      p.started = true;
+      notify('play');
+      return;
+    }
+    delete directPending[id];
+    if (phase === 'end') { notify('end'); p.resolve(); }
+    else { notify('error'); p.reject(new Error('native direct ' + phase)); }
+  };
+
   function edgeSpeak(text, voice) {
     return new Promise(function (resolve, reject) {
       try {
@@ -211,7 +286,7 @@
             '{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}');
           var reqId = randHex(32);
           var langPrefix = voice.split('-').slice(0, 2).join('-');
-          var ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='" + langPrefix + "'><voice name='" + voice + "'><prosody pitch='+0Hz' rate='" + ratePct() + "' volume='+0%'>" + escXml(text) + '</prosody></voice></speak>';
+          var ssml = "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='" + langPrefix + "'><voice name='" + voice + "'><prosody pitch='+0Hz' rate='" + ratePct(voice) + "' volume='+0%'>" + escXml(text) + '</prosody></voice></speak>';
           ws.send('X-RequestId:' + reqId + '\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:' + date + 'Z\r\nPath:ssml\r\n\r\n' + ssml);
         };
         ws.onmessage = function (ev) {
@@ -235,9 +310,28 @@
     });
   }
 
-  function ratePct() {
-    var r = Number(App.state.settings && App.state.settings.ttsRate) || 1;
-    var pct = Math.round((r - 1) * 100);
+  /* ═══ سرعة النطق: سرعتان مستقلتان ═══
+     ttsRate = سرعة صوت لغة التعلم (البطاقات والقصص والكلمات)
+     ttsRateNative = سرعة صوت اللغة الأم (الترجمات والإجابات)
+     voiceOrLang (اختياري): 'de-DE-KatjaNeural' أو 'de' — يحدد أي السرعتين تُطبّق؛
+     بدونه تُستخدم سرعة لغة التعلم (توافقية مع الاستدعاءات القديمة). */
+  function rateNum(voiceOrLang) {
+    var s = App.state.settings || {};
+    var p = App.state.profile || {};
+    var r;
+    if (voiceOrLang) {
+      var code = String(voiceOrLang).split('-')[0].toLowerCase();
+      var native = String(p.nativeLang || 'ar').toLowerCase();
+      r = (code === native) ? (Number(s.ttsRateNative) || 1) : (Number(s.ttsRate) || 1);
+    } else {
+      r = Number(s.ttsRate) || 1;
+    }
+    if (r < 0.5) r = 0.5;
+    if (r > 2) r = 2;
+    return r;
+  }
+  function ratePct(voiceOrLang) {
+    var pct = Math.round((rateNum(voiceOrLang) - 1) * 100);
     return (pct >= 0 ? '+' : '') + pct + '%';
   }
   function escXml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;'); }
@@ -328,7 +422,7 @@
       var voices = window.speechSynthesis.getVoices() || [];
       var pref = voices.filter(function (v) { return v.lang.toLowerCase().indexOf(langCode) === 0; });
       if (pref[0]) u.voice = pref[0];
-      u.rate = Number(App.state.settings && App.state.settings.ttsRate) || 1;
+      u.rate = rateNum(langCode);
       u.onstart = function () { webActive = true; notify('play'); };
       u.onend = function () { webActive = false; notify('end'); };
       u.onerror = function () { webActive = false; notify('error'); };
@@ -346,6 +440,130 @@
     }
   }
 
+  /* ═════════ كاش الصوت: تشغيل فوري من قاعدة البيانات بدل انتظار السيرفر ═════════
+     المفتاح = بصمة (voice|rate|text) — أي تغيير صوت/سرعة/نص = مفتاح جديد تلقائياً.
+     الطبقات: ذاكرة (آخر 24 صوتاً) → جدول audio_cache → توليد Edge TTS ثم تخزين.
+     المحرك المسبق (precache.js) يملأ الكاش في الخلفية فور إنشاء البطاقة/القصة. */
+  function hash32(str, seed) {
+    var h = seed >>> 0;
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return ('0000000' + h.toString(16)).slice(-8);
+  }
+  function cacheKeyOf(voice, rate, text) {
+    var s = voice + '|' + rate + '|' + text;
+    return hash32(s, 0x811c9dc5) + hash32(s, 0x9e3779b9);
+  }
+  var memCache = new Map(); /* key → Blob */
+  var MEM_CAP = 24;
+  function memPut(key, blob) {
+    if (memCache.has(key)) memCache.delete(key);
+    memCache.set(key, blob);
+    while (memCache.size > MEM_CAP) memCache.delete(memCache.keys().next().value);
+  }
+  function blobToB64(blob) {
+    return new Promise(function (resolve, reject) {
+      try {
+        var fr = new FileReader();
+        fr.onload = function () {
+          var s = String(fr.result || '');
+          var i = s.indexOf('base64,');
+          resolve(i >= 0 ? s.slice(i + 7) : '');
+        };
+        fr.onerror = function () { reject(new Error('reader')); };
+        fr.readAsDataURL(blob);
+      } catch (e) { reject(e); }
+    });
+  }
+  /* توليد فقط بلا تشغيل — لا يمس الصوت الجاري (يستخدمه التوليد المسبق في الخلفية)
+     عبر App.tts.edgeSpeak كي تتمكن المعاينة/الاختبارات من حقن بديل للشبكة */
+  function synthesizeBlobRaw(text, voice) {
+    var eng = enginePref();
+    if (IS_ANDROID) {
+      /* 'phone' صراحةً (اختياري من الإعدادات): الهاتف أولاً (أوفلاين فوري) ثم مايكروسوفت عند الفشل.
+         الافتراضي auto و'edge': صوت مايكروسوفت فقط بلا أصوات هاتف — تطابق تام مع سطح المكتب
+         (v1.7.2 حسب طلب المستخدم)، وعند تعذر الشبكة تُستكمل السلسلة بـ Google TTS ثم نطق المتصفح. */
+      if (eng === 'phone') {
+        return nativeSynthesize(text, voice).catch(function () {
+          return App.tts.edgeSpeak(text, voice);
+        });
+      }
+      return App.tts.edgeSpeak(text, voice);
+    }
+    if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
+      return tauriSynthesize(text, voice);
+    }
+    return App.tts.edgeSpeak(text, voice);
+  }
+
+  /* سلسلة الشبكة عند فشل أصوات الهاتف تماماً: Edge → Google TTS → Web Speech */
+  function networkSpeak(text, voice, langCode) {
+    return App.tts.edgeSpeak(text, voice).catch(function () {
+      return fallbackSpeak(text, langCode);
+    });
+  }
+
+  /* ─── المحرك الأصلي أندرويد: نداء غير حاجب + عودة عبر callback ─── */
+  var nativePending = {};
+  var nativeSeq = 0;
+  function nativeSynthesize(text, voice) {
+    return new Promise(function (resolve, reject) {
+      try {
+        var id = 'n' + (++nativeSeq);
+        nativePending[id] = { resolve: resolve, reject: reject };
+        window.FlashkiAndroid.ttsSynthesize(String(text), voice || '', ratePct(voice), id);
+        setTimeout(function () { /* مهلة أمان — صوت طويل أو تعليق محرك */
+          if (nativePending[id]) { delete nativePending[id]; reject(new Error('native tts timeout')); }
+        }, 60000);
+      } catch (e) { reject(e); }
+    });
+  }
+  window.__fkNativeTtsDone = function (id, b64) {
+    var p = nativePending[id];
+    if (!p) return;
+    delete nativePending[id];
+    var blob = b64 ? b64ToBlob(b64) : null;
+    if (blob) p.resolve(blob); else p.reject(new Error('native tts failed'));
+  };
+
+  function tauriSynthesize(text, voice) {
+    return window.__TAURI__.core.invoke('edge_tts_synthesize', { text: String(text), voice: voice, rate: ratePct(voice) })
+      .then(function (b64) {
+        var blob = b64 ? b64ToBlob(b64) : null;
+        if (!blob) throw new Error('empty audio');
+        return blob;
+      });
+  }
+  function saveCacheRow(key, kind, refId, voice, rate, text, blob) {
+    if (!(App.db && App.db.audioCachePut)) return Promise.resolve(false);
+    return blobToB64(blob).then(function (b64) {
+      return App.db.audioCachePut({ cacheKey: key, kind: kind, refId: refId, voice: voice, rate: rate, sourceText: text, audioB64: b64, bytes: blob.size });
+    }).catch(function () { return false; });
+  }
+  /* يضمن وجود صوت النص في الكاش: ذاكرة → DB → توليد وتخزين — بلا أي تشغيل */
+  function ensureCached(text, voice, kind, refId) {
+    var t = String(text || '').trim();
+    if (!t) return Promise.resolve({ cached: true });
+    var rate = ratePct(voice);
+    var key = cacheKeyOf(voice, rate, t);
+    if (memCache.get(key)) return Promise.resolve({ cached: true });
+    if (!(App.db && App.db.audioCacheGet)) {
+      return synthesizeBlobRaw(t, voice).then(function (blob) { memPut(key, blob); return { cached: false }; });
+    }
+    return App.db.audioCacheGet(key).then(function (row) {
+      if (row && row.audio_b64) {
+        var b = b64ToBlob(row.audio_b64);
+        if (b) { memPut(key, b); return { cached: true }; }
+      }
+      return synthesizeBlobRaw(t, voice).then(function (blob) {
+        memPut(key, blob);
+        return saveCacheRow(key, kind || 'card', refId || null, voice, rate, t, blob).then(function () { return { cached: false }; });
+      });
+    });
+  }
+
   /* ═════════ الواجهة العامة ═════════ */
   /* onBlob (اختياري): يستلم الـ MP3 بعد التوليد — يُستخدم لكاش صوت القصة لإعادة الاستماع الفوري */
   function speak(text, side, onStatus, onBlob) {
@@ -360,17 +578,58 @@
       if (blob && typeof onBlob === 'function') { try { onBlob(blob); } catch (e) {} }
       playBlob(blob);
     }
-    /* في Tauri: أمر Rust edge_tts_synthesize (لا قيود Origin). في المتصفح: fallback فوري */
-    if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
-      window.__TAURI__.core.invoke('edge_tts_synthesize', { text: String(text), voice: voice, rate: ratePct() })
-        .then(function (b64) {
-          var blob = b64 ? b64ToBlob(b64) : null;
-          if (blob) deliver(blob); else fallbackSpeak(text, lang);
-        })
-        .catch(function () { fallbackSpeak(text, lang); });
+    var rate = ratePct(voice);
+    var key = cacheKeyOf(voice, rate, String(text));
+    /* 1) الذاكرة — فوري تماماً */
+    var mem = memCache.get(key);
+    if (mem) { deliver(mem); return; }
+
+    /* 1.5) أندرويد — الإعداد 'phone' فقط يبدأ بأصوات الهاتف (أوفلاين وفوراً):
+            الافتراضي auto و'edge' يستخدمان صوت مايكروسوفت فقط (انظر synthesizeBlobRaw)،
+            وعند تعذره ينتقل إلى Google TTS ثم نطق المتصفح — نفس سلوك سطح المكتب تماماً. */
+    var eng = enginePref();
+    if (IS_ANDROID && eng === 'phone' && nativeCovers(lang)) {
+      nativeSynthesize(String(text), voice).then(function (blob) {
+        memPut(key, blob);
+        saveCacheRow(key, 'speak', null, voice, rate, String(text), blob);
+        deliver(blob);
+      }).catch(function () {
+        /* توليد الملف فشل (محرك/لغة/جهاز) — النطق المباشر أضمن على الجهاز */
+        nativeSpeakDirect(String(text), voice).catch(function () {
+          return networkSpeak(String(text), voice, lang).then(function (blob) {
+            memPut(key, blob);
+            deliver(blob);
+          });
+        });
+      });
       return;
     }
-    edgeSpeak(text, voice).then(deliver).catch(function () { fallbackSpeak(text, lang); });
+
+    /* عند تعذر توليد مايكروسوفت (بلا شبكة مثلاً) — نفس السلسلة على كل الأجهزة:
+       Google TTS → نطق المتصفح. أصوات الهاتف لا تدخل هنا إلا بإعداد 'phone' صراحة. */
+    function nativeFallback() {
+      return fallbackSpeak(text, lang);
+    }
+
+    /* 2) قاعدة البيانات (التحميل المسبق) — فوري بلا شبكة */
+    var dbp = (App.db && App.db.audioCacheGet) ? App.db.audioCacheGet(key) : Promise.resolve(null);
+    dbp.then(function (row) {
+      if (row && row.audio_b64) {
+        var b = b64ToBlob(row.audio_b64);
+        if (b) { memPut(key, b); deliver(b); return; }
+      }
+      /* 3) توليد الآن + تخزينه في الكاش للمرات القادمة */
+      synthesizeBlobRaw(String(text), voice).then(function (blob) {
+        memPut(key, blob);
+        saveCacheRow(key, 'speak', null, voice, rate, String(text), blob);
+        deliver(blob);
+      }).catch(function () { nativeFallback(); });
+    }).catch(function () {
+      synthesizeBlobRaw(String(text), voice).then(function (blob) {
+        memPut(key, blob);
+        deliver(blob);
+      }).catch(function () { nativeFallback(); });
+    });
   }
 
   function b64ToBlob(b64) {
@@ -392,6 +651,16 @@
         edgeAudio.pause();
       } catch (e) {}
     }
+    if (IS_ANDROID) {
+      /* قطع النطق المباشر الجاري على المحرك الأصلي */
+      try { if (typeof window.FlashkiAndroid.ttsStop === 'function') window.FlashkiAndroid.ttsStop(); } catch (e) {}
+      var ids = Object.keys(directPending);
+      for (var i = 0; i < ids.length; i++) {
+        var p = directPending[ids[i]];
+        delete directPending[ids[i]];
+        if (p && !p.started) { try { p.reject(new Error('cancelled')); } catch (e) {} }
+      }
+    }
     if (webSpeechSupported()) {
       try { window.speechSynthesis.cancel(); } catch (e) {}
     }
@@ -411,12 +680,19 @@
   }
 
   /* يُستدعى من boot — لم تعد تملأ قائمة صوت واحد؛ توافقية مع الكود القديم */
-  function loadVoices() { if (webSpeechSupported()) { try { window.speechSynthesis.getVoices(); } catch (e) {} } }
+  function loadVoices() {
+    if (webSpeechSupported()) { try { window.speechSynthesis.getVoices(); } catch (e) {} }
+    if (IS_ANDROID) setTimeout(fetchNativeInfo, 800); /* المحرك يجهز بعد الإقلاع */
+  }
   function supported() { return true; /* Edge TTS دائماً + fallback */ }
 
   App.tts = {
     supported: supported, speak: speak, cancel: cancel, loadVoices: loadVoices,
     detectLang: detectLang, voiceFor: voiceFor, EDGE_VOICES: EDGE_VOICES,
-    edgeSpeak: edgeSpeak, playAudioBlob: playAudioBlob, _genGec: genGec, isSpeaking: isSpeaking
+    edgeSpeak: edgeSpeak, playAudioBlob: playAudioBlob, _genGec: genGec, isSpeaking: isSpeaking,
+    ensureCached: ensureCached, synthesizeBlobRaw: synthesizeBlobRaw,
+    nativeInfo: function () { return nativeInfo; },
+    enginePref: enginePref,
+    cacheKeyFor: function (text, voice) { return cacheKeyOf(voice, ratePct(voice), String(text || '').trim()); }
   };
 })();

@@ -158,13 +158,14 @@
       '- Use the user input below as the core theme, or weave the given words naturally into the story\n' +
       '\n' +
       'Return STRICT JSON only — no markdown, no code fences, no commentary:\n' +
-      '{"title":"...","story":"...","translation":"...","sentences":[{"target":"...","native":"..."}],"vocabulary":[{"word":"...","meaning":"..."}]}\n' +
+      '{"title":"...","story":"...","translation":"...","wordTranslations":{"word1":"...","word2":"..."},"vocabulary":[{"word":"...","meaning":"..."}],"sentences":[{"target":"...","native":"..."}]}\n' +
       '\n' +
       '- title: short story title in ' + targetName + '\n' +
-      '- story: the complete story in ' + targetName + '\n' +
-      '- translation: complete faithful translation of the story in ' + nativeName + '\n' +
-      '- sentences: array of each individual sentence in ' + targetName + ' ("target") matched with its direct translation in ' + nativeName + ' ("native")\n' +
+      '- story: the complete story in ' + targetName + ' ONLY — never in ' + nativeName + '\n' +
+      '- translation: complete faithful translation of the whole story in ' + nativeName + ' ONLY\n' +
+      '- wordTranslations: CRITICAL — one JSON object mapping EVERY distinct word that appears in the story (lowercased, exactly as written in the story) to its short translation in ' + nativeName + '. Cover ALL words: nouns, verbs including conjugated forms as they appear, adjectives, adverbs, pronouns, articles, prepositions, conjunctions and numbers — do NOT skip small function words. Values are translation strings only, no explanations. Before answering, verify the object has an entry for EVERY distinct word of your story — any missing word forces an extra API call later.\n' +
       '- vocabulary: ' + spec.vocab + ' key words or expressions from the story that a learner at ' + cefr + ' might not know, each with its precise meaning in ' + nativeName + '\n' +
+      '- sentences: array of each individual sentence in ' + targetName + ' ("target") matched with its direct translation in ' + nativeName + ' ("native")\n' +
       '\n' +
       'USER INPUT (topic, theme or words to include):\n' +
       '"""\n' + text + '\n"""';
@@ -175,7 +176,9 @@
     s = s.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
     var start = s.indexOf('{'), end = s.lastIndexOf('}');
     if (start > 0 || end < s.length - 1) { if (start >= 0 && end > start) s = s.slice(start, end + 1); }
-    var data = JSON.parse(s);
+    var data;
+    try { data = JSON.parse(s); }
+    catch (e) { data = salvageTruncatedStory(s); }
     if (!data || !data.story) throw new Error('bad format');
     var vocab = (Array.isArray(data.vocabulary) ? data.vocabulary : []).map(function (v) {
       if (!v || !v.word) return null;
@@ -191,12 +194,45 @@
         };
       }).filter(Boolean);
     }
+    /* قاموس ترجمة كل كلمات القصة — جاهز من نفس الطلب: النقر على أي كلمة
+       يعرض ترجمتها فوراً بلا استدعاء AI (wordTranslations) */
+    var wt = {};
+    if (data.wordTranslations && typeof data.wordTranslations === 'object') {
+      var wtKeys = Object.keys(data.wordTranslations);
+      for (var wi = 0; wi < wtKeys.length && Object.keys(wt).length < 600; wi++) {
+        var wk = String(wtKeys[wi] || '').trim().toLowerCase();
+        var wv = String(data.wordTranslations[wtKeys[wi]] || '').trim();
+        if (wk && wv && wk.length >= 2 && wv.length <= 120) wt[wk] = wv;
+      }
+    }
     return {
       title: String(data.title || '').trim(),
       story: String(data.story).trim(),
       translation: String(data.translation || '').trim(),
       sentences: sentences,
-      vocabulary: vocab
+      vocabulary: vocab,
+      wordTranslations: wt
+    };
+  }
+
+  /* إن قُطع الرد عند حد الرموز (finishReason=MAX_TOKENS) قبل إغلاق JSON:
+     العنوان والقصة والترجمة تسبق sentences في العقد فتكون غالباً كاملة —
+     نستخرجها ونكمل بتنسيق القصة بدل إفشال التوليد كلياً
+     (جمل الترجمة السطرية تعاد تقسيمها محلياً في pairStorySentences) */
+  function salvageTruncatedStory(s) {
+    function grab(key) {
+      var m = new RegExp('"' + key + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"').exec(s);
+      if (!m) return '';
+      try { return JSON.parse('"' + m[1] + '"'); } catch (e) { return m[1]; }
+    }
+    var story = grab('story');
+    if (!story) return null;
+    return {
+      title: grab('title'),
+      story: story,
+      translation: grab('translation'),
+      sentences: [],
+      vocabulary: []
     };
   }
 
@@ -210,9 +246,11 @@
 
   /* ⚠️ v20: بدون thinkingConfig(budget=0) يستهلك النموذج كل الرصيد في "التفكير"
      (thoughtsTokenCount >> candidatesTokenCount) ويعيد نصاً فارغاً — هذا هو سبب
-     فشل التوليد الحقيقي. إن رفض نموذج thinkingConfig نفسه → إعادة بلا تفكير ثم السلسلة. */
-  function generationConfig(json, schema, noThinking) {
-    var gc = { temperature: 0.4, maxOutputTokens: 4096 };
+     فشل التوليد الحقيقي. إن رفض نموذج thinkingConfig نفسه → إعادة بلا تفكير ثم السلسلة.
+     maxOutputTokens: 4096 كان يقطع JSON القصة (قصة + ترجمة + sentences + مفردات) عند
+     المستويات الأعلى فيصبح JSON غير مكتمل ولا يُفك — 8192 للقصة، والباقي 4096. */
+  function generationConfig(json, schema, noThinking, maxTokens) {
+    var gc = { temperature: 0.4, maxOutputTokens: maxTokens || 4096 };
     if (!noThinking) gc.thinkingConfig = { thinkingBudget: 0 };
     if (json) {
       gc.responseMimeType = 'application/json';
@@ -235,6 +273,17 @@
         'output:', u.candidatesTokenCount || 0, 'thoughts:', u.thoughtsTokenCount || 0);
     } catch (e) {}
   }
+
+  /* توحيد استخراج رسالة الخطأ: Tauri (invoke) يعيد string خام بلا خاصية message —
+     بدون هذا تضيع تفاصيل 429/ازدحام/قصّ الرد ويظهر "فشل التوليد" فقط بلا سبب */
+  function errMsg(e) {
+    if (e == null) return '';
+    if (typeof e === 'string') return e;
+    if (e.message) return String(e.message);
+    try { return JSON.stringify(e); } catch (_) { return String(e); }
+  }
+
+  function delay(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
 
   function modelList() {
     var m = (App.state.settings && App.state.settings.model) || '';
@@ -263,10 +312,11 @@
     return { kind: 'network', message: msg };
   }
 
-  function callTauri(apiKey, model, prompt, json, schema, noThinking) {
+  function callTauri(apiKey, model, prompt, json, schema, noThinking, maxTokens) {
     return window.__TAURI__.core.invoke('gemini_generate', {
       apiKey: apiKey, model: model, prompt: prompt,
-      jsonMode: !!json, schema: schema || null, useThinking: !noThinking
+      jsonMode: !!json, schema: schema || null, useThinking: !noThinking,
+      maxTokens: maxTokens || 4096
     }).then(function (res) {
       /* Rust يعيد { text, usage } — النص مستخرج جاهزاً + اللوج في الطرفية */
       logUsage(res && res.usage);
@@ -276,58 +326,113 @@
     });
   }
 
-  function callBrowser(apiKey, model, prompt, json, schema, noThinking) {
+  /* مسار المتصفح/أندرويد. على أندرويد يُمرَّر الطلب عبر الجسر الأصلي
+     (HttpURLConnection بلا قيود CORS — الويب فيو يحجب أحياناً preflight لـ
+     generativelanguage.googleapis.com فيظهر "Failed to fetch" والشبكة سليمة)،
+     وعند غياب الجسر (الويب/المعاينة) fetch مباشر — Gemini يدعم CORS. */
+  function callBrowser(apiKey, model, prompt, json, schema, noThinking, maxTokens) {
     var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) +
       ':generateContent?key=' + encodeURIComponent(apiKey);
-    var body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: generationConfig(json, schema, noThinking) };
-    return fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    }).then(function (resp) {
-      return resp.json().then(function (data) {
-        if (!resp.ok) {
-          var msg = (data && data.error && data.error.message) || ('HTTP ' + resp.status);
-          throw new Error(msg);
+    var bodyStr = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: generationConfig(json, schema, noThinking, maxTokens) });
+
+    /* توحيد استخراج النص من رد Google — يعمل على المسارين، ويرمي رسالة الخطأ
+       الحقيقية من Google (مفتاح/حصة/نموذج/400) كي يفهمها سلّم المحاولات */
+    function extract(status, rawText) {
+      var data;
+      try { data = JSON.parse(rawText); }
+      catch (e) { throw new Error('HTTP ' + status + ' — ' + String(rawText || '').slice(0, 160)); }
+      if (status >= 400) {
+        var msg = (data && data.error && data.error.message) || ('HTTP ' + status);
+        throw new Error(msg);
+      }
+      logUsage(data && data.usageMetadata);
+      var parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+      var out = parts.map(function (p) { return p.text || ''; }).join('');
+      if (!out.trim()) {
+        var finish = (data.candidates && data.candidates[0] && data.candidates[0].finishReason) || '?';
+        throw new Error('empty response (finishReason=' + finish + ')');
+      }
+      return out;
+    }
+
+    function viaNative() {
+      return App.androidHttp.post(url, bodyStr).then(function (r) {
+        return extract(r.status, r.body);
+      }).catch(function (e) {
+        /* أخطاء HTTP الحقيقية (status >= 400) تحمل نص Google — حلّلها لاستخراج الرسالة */
+        if (e && typeof e.status === 'number' && e.status >= 400 && e.body != null) {
+          return extract(e.status, e.body);
         }
-        logUsage(data && data.usageMetadata);
-        var parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
-        var out = parts.map(function (p) { return p.text || ''; }).join('');
-        if (!out.trim()) {
-          var finish = (data.candidates && data.candidates[0] && data.candidates[0].finishReason) || '?';
-          throw new Error('empty response (finishReason=' + finish + ')');
-        }
-        return out;
-      });
-    });
-  }
-
-  function call(apiKey, model, prompt, json, schema, noThinking) {
-    var isTauri = !!(window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
-    return isTauri ? callTauri(apiKey, model, prompt, json, schema, noThinking)
-                   : callBrowser(apiKey, model, prompt, json, schema, noThinking);
-  }
-
-  /* النموذج رفض thinkingConfig نفسه (400 invalid JSON payload) → أعد بلا تفكير على النموذج نفسه */
-  function isThinkingErr(msg) {
-    return /thinkingConfig|thinking_budget|thinkingBudget|thinking_config/i.test(String(msg || ''));
-  }
-
-  /* استدعاء ذكي: يجرب النموذج المختار ثم البدائل تلقائياً —
-     thinkingConfig مرفوض → إعادة على نفس النموذج بلا تفكير؛
-     خطأ نموذج (404/إيقاف) أو ازدحام (429/503 high demand) → النموذج التالي */
-  function callSmart(apiKey, prompt, json, schema) {
-    var models = modelList();
-    var i = 0;
-    function attempt(noThinking) {
-      return call(apiKey, models[i], prompt, json, schema, noThinking).catch(function (e) {
-        var m = e && e.message;
-        if (!noThinking && isThinkingErr(m)) return attempt(true);
-        if (i < models.length - 1 && (isModelErr(m) || isBusyErr(m))) { i++; return attempt(false); }
-        throw e;
+        throw new Error('Failed to fetch');
       });
     }
-    return attempt(false);
+
+    function viaFetch() {
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: bodyStr
+      }).then(function (resp) {
+        return resp.json().then(function (data) {
+          if (!resp.ok) {
+            var msg = (data && data.error && data.error.message) || ('HTTP ' + resp.status);
+            throw new Error(msg);
+          }
+          logUsage(data && data.usageMetadata);
+          var parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+          var out = parts.map(function (p) { return p.text || ''; }).join('');
+          if (!out.trim()) {
+            var finish = (data.candidates && data.candidates[0] && data.candidates[0].finishReason) || '?';
+            throw new Error('empty response (finishReason=' + finish + ')');
+          }
+          return out;
+        });
+      });
+    }
+
+    return (App.androidHttp && App.androidHttp.post) ? viaNative() : viaFetch();
+  }
+
+  function call(apiKey, model, prompt, json, schema, noThinking, maxTokens) {
+    var isTauri = !!(window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke);
+    return isTauri ? callTauri(apiKey, model, prompt, json, schema, noThinking, maxTokens)
+                   : callBrowser(apiKey, model, prompt, json, schema, noThinking, maxTokens);
+  }
+
+  /* استدعاء ذكي: يجرب النموذج المختار ثم البدائل تلقائياً.
+     سلّم تخفيض الطلب على نفس النموذج عند رفض 400 ("Request contains an invalid
+     argument" — نماذج 3.x ترفض thinkingBudget=0 بهذه الرسالة العامة بلا ذكر
+     اسم الحقل): كامل (تفكير+JSON+مخطط) → بلا تفكير → بسيط (تعليمات JSON في
+     البرومبت فقط بلا responseMimeType/مخطط). عند استنفاد الدرجات ينتقل للنموذج
+     التالي. ازدحام (429/503) → النموذج التالي، وعند استنفاد السلسلة جولة أخيرة
+     بعد مهلة قصيرة. */
+  var CHAIN_BUSY_PASSES = 2;
+  var CHAIN_BUSY_DELAY_MS = 3500;
+
+  function isBadRequestErr(msg) {
+    return /invalid argument|INVALID_ARGUMENT|invalid JSON payload|thinkingConfig|thinking_budget|thinkingBudget|thinking_config/i.test(String(msg || ''));
+  }
+
+  function callSmart(apiKey, prompt, json, schema, maxTokens) {
+    var models = modelList();
+    var mi = 0, grade = 0, passes = 1;
+    function attempt() {
+      var noThinking = grade >= 1;
+      var plain = grade >= 2;
+      return call(apiKey, models[mi], prompt, json && !plain, plain ? null : schema, noThinking, maxTokens).catch(function (e) {
+        var m = errMsg(e);
+        /* رفض 400 → تراجع درجة على نفس النموذج قبل تغييره */
+        if (grade < 2 && isBadRequestErr(m)) { grade++; return attempt(); }
+        if (mi < models.length - 1 && (isModelErr(m) || isBusyErr(m) || isBadRequestErr(m))) { mi++; grade = 0; return attempt(); }
+        if (isBusyErr(m) && passes < CHAIN_BUSY_PASSES) {
+          passes++;
+          mi = 0; grade = 0;
+          return delay(CHAIN_BUSY_DELAY_MS).then(function () { return attempt(); });
+        }
+        throw new Error(m || 'unknown error');
+      });
+    }
+    return attempt();
   }
 
   var AR_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
@@ -430,13 +535,77 @@
     return callSmart(settings.apiKey, buildTranslatePrompt(text), true, TRANSLATION_SCHEMA).then(extractTranslation);
   }
 
-  /* توليد قصة من نص/كلمات — JSON صارم */
+  /* توليد قصة من نص/كلمات — JSON صارم. القصة أطول مخرجات التطبيق
+     (قصة + ترجمة كاملة + قاموس كل الكلمات + كل جملة بترجمتها + مفردات)
+     → 12288 رمزاً كي لا يُقطع الرد (إن قُطع: salvage ينقذ الحقول الكاملة) */
+  var STORY_MAX_TOKENS = 12288;
+
   function generateStory(text) {
     var settings = App.state.settings;
     if (!settings.apiKey) return Promise.reject({ message: App.t('aiNoKey') });
     var prompt = buildStoryPrompt(text);
     App.lastPrompt = prompt;
-    return callSmart(settings.apiKey, prompt, true).then(parseStory);
+    return callSmart(settings.apiKey, prompt, true, null, STORY_MAX_TOKENS)
+      .then(parseStory)
+      .then(completeWordTranslations);
+  }
+
+  /* ═════════ تعبئة ترجمات كلمات القصة في نفس جلسة التوليد ═════════
+     البرومبت يطلب من النموذج ترجمة كل كلمات القصة، لكنه أحياناً يهمل بعضها.
+     هنا نفحص التغطية بعد التوليد مباشرة: أي كلمات ناقصة تُرسل في طلب AI
+     واحد دفعي (لا طلب لكل كلمة عند كل نقرة أثناء الحصة) ثم تُدمج في
+     wordTranslations. عند فشل الدفعة يبقى سقوط الكلمة-بالكلمة القديم في
+     handlers.js يعمل كالمعتاد. */
+  function completeWordTranslations(storyData) {
+    try {
+      if (!storyData || !storyData.story) return Promise.resolve(storyData);
+      if (!storyData.wordTranslations || typeof storyData.wordTranslations !== 'object') {
+        storyData.wordTranslations = {};
+      }
+      var words = String(storyData.story).toLowerCase().match(/[\p{L}\p{N}'’-]+/gu) || [];
+      var seen = {}, missing = [];
+      for (var i = 0; i < words.length; i++) {
+        var w = words[i];
+        if (w.length < 2 || seen[w]) continue;
+        seen[w] = 1;
+        if (!storyData.wordTranslations[w]) missing.push(w);
+      }
+      if (!missing.length) return Promise.resolve(storyData);
+
+      var settings = App.state.settings;
+      if (!settings.apiKey) return Promise.resolve(storyData);
+      var p = profile();
+      var prompt =
+        'Translate each ' + ln(p.targetLang) + ' word below into ' + ln(p.nativeLang) + '.\n' +
+        'These words come from a language-learning story; give the meaning relevant to a story context, short (1-3 words), no explanations.\n' +
+        'Return STRICT JSON only — one object mapping each input word (exactly as given, lowercased) to its short translation.\n' +
+        'Example: {"haus":"بيت","ging":"ذهب"}\n' +
+        '\n' +
+        'Words (one per line):\n' +
+        missing.join('\n');
+      return callSmart(settings.apiKey, prompt, true, null, 8192).then(function (raw) {
+        var s = String(raw || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+        var start = s.indexOf('{'), end = s.lastIndexOf('}');
+        if (start < 0 || end <= start) return storyData;
+        var map;
+        try { map = JSON.parse(s.slice(start, end + 1)); } catch (e) { return storyData; }
+        if (!map || typeof map !== 'object') return storyData;
+        var added = 0;
+        var keys = Object.keys(map);
+        for (var k = 0; k < keys.length && added < 600; k++) {
+          var kw = String(keys[k] || '').trim().toLowerCase();
+          var kv = String(map[keys[k]] || '').trim();
+          if (kw && kv && kv.length <= 120 && !storyData.wordTranslations[kw]) {
+            storyData.wordTranslations[kw] = kv;
+            added++;
+          }
+        }
+        console.log('[flashki] story word coverage — filled', added, 'of', missing.length, 'missing words');
+        return storyData;
+      }).catch(function () { return storyData; });
+    } catch (e) {
+      return Promise.resolve(storyData);
+    }
   }
 
   /* توليد بطاقة واحدة مباشرة من كلمة داخل سياق القصة */
@@ -506,8 +675,9 @@
     generate: generate, parseCards: parseCards, buildPrompt: buildPrompt,
     buildTranslatePrompt: buildTranslatePrompt, translate: translate,
     extractTranslation: extractTranslation, verifyKey: verifyKey,
-    classifyKeyError: classifyKeyError, isBusyError: isBusyErr,
+    classifyKeyError: classifyKeyError, isBusyError: isBusyErr, errMsg: errMsg,
     buildStoryPrompt: buildStoryPrompt, generateStory: generateStory, parseStory: parseStory,
+    completeWordTranslations: completeWordTranslations,
     createCardFromWord: createCardFromWord,
     modelList: modelList, isDeadModel: function (m) { return DEAD_MODELS.indexOf(m) >= 0; }
   };

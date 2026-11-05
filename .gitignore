@@ -4,3 +4,7 @@ src-tauri/gen/
 dist/
 *.log
 .DS_Store
+android/build/
+android/dist/
+android/keystore/KEYS.env
+android/keystore/*.jks

@@ -246,6 +246,19 @@
     var table = (storeName === 'kv') ? 'settings' : TABLES[storeName].name;
     return sqlRun('DELETE FROM ' + table).then(persistWasm);
   }
+  function flush() {
+    /* حفظ فوري لقاعدة wasm — تُستدعى قبل إعادة تحميل الصفحة (المسح النهائي) كي لا يُفقد أثر الحذف */
+    if (backend !== 'wasm' || !wasmDb) return Promise.resolve();
+    if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
+    try {
+      var data = wasmDb.export();
+      var bin = '';
+      var chunk = 0x8000;
+      for (var i = 0; i < data.length; i += chunk) bin += String.fromCharCode.apply(null, data.subarray(i, i + chunk));
+      localStorage.setItem(LS_KEY, btoa(bin));
+      return Promise.resolve();
+    } catch (e) { console.warn('db: flush failed', e); return Promise.resolve(); }
+  }
   /* kv → جدول settings (قيم JSON) */
   function kvGet(key) {
     return sqlAll('SELECT value FROM settings WHERE key = ?', [key]).then(function (rows) {
@@ -256,7 +269,37 @@
     return sqlRun('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, JSON.stringify(value)]).then(persistWasm);
   }
 
+  /* ═════════ كاش الصوت المولد مسبقاً (جدول audio_cache) ═════════
+     الصف: { cacheKey, kind, refId, voice, rate, sourceText, audioB64, bytes, createdAt }
+     حد الحجم يحمي تخزين المعاينة (localStorage) — Tauri يسمح بأكبر (قصة طويلة كاملة) */
+  var AUDIO_ROW_LIMIT = 700;
+  function audioSizeCap() { return backend === 'tauri' ? 4000000 : 900000; }
+
+  function audioCacheGet(cacheKey) {
+    return sqlAll('SELECT * FROM audio_cache WHERE cache_key = ?', [cacheKey]).then(function (rows) {
+      return rows.length ? rows[0] : null;
+    });
+  }
+  function audioCachePut(info) {
+    var b64 = String(info.audioB64 || '');
+    if (!info.cacheKey || !b64) return Promise.resolve(false);
+    if (b64.length > audioSizeCap()) return Promise.resolve(false); /* كبير جداً — يُولَّد عند الطلب */
+    return sqlRun('INSERT OR REPLACE INTO audio_cache (cache_key, kind, ref_id, voice, rate, source_text, audio_b64, bytes, created_at) VALUES (?,?,?,?,?,?,?,?,?)',
+      [info.cacheKey, info.kind || 'card', info.refId || null, info.voice || null, info.rate || null,
+       String(info.sourceText || '').slice(0, 4000), b64, info.bytes || Math.round(b64.length * 0.75), info.createdAt || Date.now()])
+      .then(function () {
+        /* تقليم: أبقِ أحدث الصفوف فقط (يحمي حصة التخزين في المعاينة) */
+        return sqlRun('DELETE FROM audio_cache WHERE id NOT IN (SELECT id FROM audio_cache ORDER BY created_at DESC, id DESC LIMIT ' + AUDIO_ROW_LIMIT + ')');
+      })
+      .then(persistWasm).then(function () { return true; })
+      .catch(function (e) { console.warn('db: audioCachePut failed', e); return false; });
+  }
+  function audioCacheClear() {
+    return sqlRun('DELETE FROM audio_cache').then(persistWasm);
+  }
+
   App.db = { init: init, open: init, backend: function () { return backend; },
-    getAll: getAll, get: get, put: put, add: add, del: del, clear: clear,
-    kvGet: kvGet, kvSet: kvSet };
+    getAll: getAll, get: get, put: put, add: add, del: del, clear: clear, flush: flush,
+    kvGet: kvGet, kvSet: kvSet,
+    audioCacheGet: audioCacheGet, audioCachePut: audioCachePut, audioCacheClear: audioCacheClear };
 })();

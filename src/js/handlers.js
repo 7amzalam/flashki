@@ -221,7 +221,14 @@
     }).catch(function () { return ''; });
   }
 
-  /* ═════════ فحص التحديثات (v20): حالات واضحة — جارٍ / لا تحديثات / متاح / فشل ═════════ */
+  /* ═════════ التحديثات (v23): فحص ← تحميل وتثبيت بتقدم ← إعادة تشغيل تلقائية ═════════ */
+  var pendingUpdate = null;
+
+  function updaterJsApi() {
+    var T = window.__TAURI__;
+    return (T && T.updater && typeof T.updater.check === 'function') ? T.updater : null;
+  }
+
   function checkAppUpdate() {
     var btn = getEl('checkUpdateBtn'), st = getEl('updateStatus');
     if (!btn) return;
@@ -233,12 +240,19 @@
     btn.disabled = true;
     btn.textContent = App.t('updateChecking');
     if (st) st.textContent = App.t('updateChecking');
-    window.__TAURI__.core.invoke('plugin:updater|check').then(function (update) {
+    var jsApi = updaterJsApi();
+    var p = jsApi ? jsApi.check() : window.__TAURI__.core.invoke('plugin:updater|check');
+    p.then(function (update) {
+      var ib = getEl('installUpdateBtn');
       if (update && update.version) {
+        pendingUpdate = update;
         var msg = App.t('updateAvailable') + ' — v' + update.version;
         if (st) st.textContent = msg;
+        if (ib) ib.style.display = '';
         U.toast(msg, 'success', 7000);
       } else {
+        pendingUpdate = null;
+        if (ib) ib.style.display = 'none';
         if (st) st.textContent = App.t('updateNoUpdates');
         U.toast(App.t('updateNoUpdates'), 'success');
       }
@@ -252,6 +266,59 @@
       btn.textContent = old;
     });
   }
+
+  /* التثبيت: قنوات تقدم (Started/Progress/Finished) ثم إعادة تشغيل عبر restart_app */
+  function installPendingUpdate() {
+    var st = getEl('updateStatus');
+    var ib = getEl('installUpdateBtn'), cb = getEl('checkUpdateBtn');
+    if (!pendingUpdate || !ib || !isTauri()) return;
+    ib.disabled = true;
+    if (cb) cb.disabled = true;
+    var setSt = function (s) { if (st) st.textContent = s; };
+    setSt(App.t('updateDownloading'));
+    var dlTotal = 0, dlDone = 0;
+    var onEvent = function (ev) {
+      if (!ev || !ev.event) return;
+      if (ev.event === 'Started') {
+        dlTotal = (ev.data && ev.data.contentLength) || 0;
+        dlDone = 0;
+      } else if (ev.event === 'Progress') {
+        dlDone += (ev.data && ev.data.chunkLength) || 0;
+        if (dlTotal > 0) setSt(App.t('updateDownloading') + ' ' + Math.min(100, Math.round((dlDone * 100) / dlTotal)) + '%');
+        else setSt(App.t('updateDownloading') + ' ' + (dlDone / 1048576).toFixed(1) + ' MB');
+      } else if (ev.event === 'Finished') {
+        setSt(App.t('updateInstalling'));
+      }
+    };
+    var jsApi = updaterJsApi();
+    var p;
+    if (jsApi && typeof pendingUpdate.downloadAndInstall === 'function') {
+      p = pendingUpdate.downloadAndInstall(onEvent);
+    } else {
+      var ch = new window.__TAURI__.core.Channel();
+      ch.onmessage = onEvent;
+      p = window.__TAURI__.core.invoke('plugin:updater|download_and_install', { onEvent: ch });
+    }
+    p.then(function () {
+      pendingUpdate = null;
+      ib.style.display = 'none';
+      setSt(App.t('updateInstalled'));
+      U.toast(App.t('updateInstalled'), 'success', 6000);
+      return window.__TAURI__.core.invoke('restart_app');
+    }).catch(function (e) {
+      var msg = (e && (e.message || e)) || '';
+      setSt(App.t('updateInstallFailed') + (msg ? ' — ' + msg : ''));
+      U.toast(App.t('updateInstallFailed'), 'error', 7000);
+      ib.disabled = false;
+      if (cb) cb.disabled = false;
+    });
+  }
+
+  /* render.js يقرأ هذا ليعيد حالة التحديث عند الرجوع للإعدادات */
+  App.updateUI = {
+    pending: function () { return !!pendingUpdate; },
+    version: function () { return pendingUpdate && pendingUpdate.version ? pendingUpdate.version : ''; }
+  };
 
   function saveManualCard() {
     var front = getEl('frontInput').value.trim();
@@ -335,6 +402,7 @@
           App.state.cards.push(card);
           return App.store.saveCard(card);
         }).then(function () {
+          if (App.precache) App.precache.enqueueCard(card); /* صوت البطاقة يُولَّد الآن في الخلفية */
           U.toast(App.t('savedOk'), 'success');
           getEl('frontInput').value = ''; getEl('backInput').value = ''; getEl('tagsInput').value = '';
           if (getEl('exampleInput')) getEl('exampleInput').value = '';
@@ -383,7 +451,7 @@
     var recB = document.querySelector('.voice-recorder[data-recorder="back"]');
     if (recF) App.audio.clear(recF);
     if (recB) App.audio.clear(recB);
-    getEl('twoSidedRow').style.display = 'none';
+    var tsrE = getEl('twoSidedRow'); if (tsrE) tsrE.style.display = 'none'; /* الصف حُذف من الواجهة سابقاً — حراسة ضد null */
     getEl('cancelEditCardBtn').style.display = '';
     var lbl = getEl('saveCardBtn').querySelector('span');
     if (lbl) lbl.textContent = App.t('saveChanges');
@@ -401,7 +469,7 @@
     getEl('frontInput').value = ''; getEl('backInput').value = ''; getEl('tagsInput').value = '';
     if (getEl('exampleInput')) getEl('exampleInput').value = '';
     if (getEl('exampleTranslationInput')) getEl('exampleTranslationInput').value = '';
-    getEl('twoSidedRow').style.display = '';
+    var tsrX = getEl('twoSidedRow'); if (tsrX) tsrX.style.display = ''; /* حراسة ضد null */
     getEl('cancelEditCardBtn').style.display = 'none';
     var lbl = getEl('saveCardBtn').querySelector('span');
     if (lbl) lbl.textContent = App.t('saveCard');
@@ -479,16 +547,38 @@
       fillAiDeckModal();
       showModal('aiResultModal');
     }).catch(function (e) {
-      var m = e && e.message ? String(e.message) : '';
-      var msg = (App.ai && App.ai.isBusyError && App.ai.isBusyError(m))
-        ? App.t('aiBusy') + (m ? ' — ' + m : '')
-        : ((e && e.message) ? App.t('aiFailed') + e.message : App.t('aiFailed'));
-      U.toast(msg, 'error', 6000);
+      U.toast(aiFailMsg(e), 'error', 6000);
     }).then(function () {
       btn.disabled = false;
       btn.style.opacity = '';
       getEl('aiCost').textContent = '';
     });
+  }
+
+  /* رسالة خطأ موحّدة: Tauri يعيد string خام بلا .message — كان يظهر "فشل التوليد" بلا تفاصيل */
+  function aiErrMsg(e) {
+    return (App.ai && App.ai.errMsg) ? App.ai.errMsg(e) : ((e && e.message) ? String(e.message) : String(e || ''));
+  }
+  function aiFailMsg(e) {
+    var m = aiErrMsg(e);
+    var M = String(m || '');
+    /* فشل شبكة (fetch/CORS/DNS/مهلة): أشيعها على الهاتف — رسالة عربية مفهومة بدل "Failed to fetch" */
+    if (/failed to fetch|networkerror|net::|err_inet|err_connection|err_name|err_network|timed? ?out|timeout|network error|socket/i.test(M))
+      return App.t('aiNetFail');
+    if (/API key not valid|API_KEY_INVALID|invalid API key/i.test(M))
+      return App.t('aiBadKey');
+    if (/location is not supported/i.test(M))
+      return App.t('aiGeo');
+    if (App.ai && App.ai.isBusyError && App.ai.isBusyError(M))
+      return App.t('aiBusy');
+    /* رفض الطلب 400 بعد استنفاد سلّم المحاولات (thinking/مخطط) */
+    if (/invalid argument|INVALID_ARGUMENT|invalid JSON payload/i.test(M))
+      return App.t('aiBadReq');
+    if (/no longer available|is not found|not found for API version|not supported for generateContent/i.test(M))
+      return App.t('aiModelGone');
+    if (/empty response/i.test(M))
+      return App.t('aiEmptyResp');
+    return App.t('aiFailed') + (M ? ' — ' + M : '');
   }
 
   /* ═════════ توليد قصة ═════════ */
@@ -505,12 +595,9 @@
       App.state.lastStory = story;
       renderStoryResult(story);
       showModal('storyResultModal');
+      if (App.precache) App.precache.enqueueStory(story); /* صوت القصة ثم كلماتها المهمة — في الخلفية فوراً */
     }).catch(function (e) {
-      var m = e && e.message ? String(e.message) : '';
-      var msg = (App.ai && App.ai.isBusyError && App.ai.isBusyError(m))
-        ? App.t('aiBusy') + (m ? ' — ' + m : '')
-        : ((e && e.message) ? App.t('aiFailed') + e.message : App.t('aiFailed'));
-      U.toast(msg, 'error', 6000);
+      U.toast(aiFailMsg(e), 'error', 8000);
     }).then(function () {
       btn.disabled = false;
       btn.style.opacity = '';
@@ -697,6 +784,37 @@
     currentWordElement = null;
   }
 
+  /* ═════════ قاموس كلمات القصة المترجم مسبقاً (نقر = فوري بلا أي استدعاء AI) ═════════
+     القصة تُولَّد بترجمة كل كلماتها في نفس الطلب (wordTranslations) — النقر يبحث هنا
+     أولاً. الكلمة الناقصة فقط تُترجم بالذكاء الاصطناعي ثم تُخزَّن في القاموس فلا تُطلب مرة أخرى أبداً */
+  function normStoryWord(w) {
+    return String(w || '').toLowerCase().replace(/[^\p{L}\p{N}'’-]/gu, '');
+  }
+  function lookupWordTranslation(st, word) {
+    if (!st || !st.wordTranslations || !word) return '';
+    var w = normStoryWord(word);
+    if (!w) return '';
+    var dict = st.wordTranslations;
+    if (dict[w]) return dict[w];
+    /* صيغة الظهور قد تختلف عن مفتاح القاموس (لواحق تصريف شائعة) — اقتطاع حذر */
+    var stems = [];
+    ['es', 'en', 'er', 'n', 's', 'e'].forEach(function (suf) {
+      if (w.length - suf.length >= 3 && w.slice(-suf.length) === suf) stems.push(w.slice(0, -suf.length));
+    });
+    for (var i = 0; i < stems.length; i++) if (dict[stems[i]]) return dict[stems[i]];
+    return '';
+  }
+  function cacheWordTranslation(word, meaning) {
+    var st = App.state.lastStory;
+    if (!st || !word || !meaning) return;
+    if (!st.wordTranslations) st.wordTranslations = {};
+    var w = normStoryWord(word);
+    if (w && !st.wordTranslations[w]) {
+      st.wordTranslations[w] = String(meaning);
+      try { localStorage.setItem('flashki_last_story', JSON.stringify(st)); } catch (err) {}
+    }
+  }
+
   function openStoryWordPopover(wordEl) {
     var word = (wordEl.getAttribute('data-word') || wordEl.textContent || '').trim();
     if (!word || word.length < 2) return;
@@ -712,8 +830,10 @@
       return (c.front || '').toLowerCase().indexOf(word.toLowerCase()) >= 0;
     });
 
-    var knownMeaning = '';
-    if (st && st.vocabulary) {
+    /* الترجمة الفورية: قاموس القصة المولّد مع الطلب أولاً، ثم مفردات القصة،
+       وأخيراً فقط (كلمة ناقصة) استدعاء AI واحد يُخزَّن فلا يتكرر */
+    var knownMeaning = lookupWordTranslation(st, word);
+    if (!knownMeaning && st && st.vocabulary) {
       var match = st.vocabulary.filter(function (v) {
         var vw = (v.word || '').toLowerCase();
         var w = word.toLowerCase();
@@ -725,11 +845,19 @@
     pop.innerHTML =
       '<div class="story-pop-head">' +
         '<span class="story-pop-word">' + U.esc(word) + '</span>' +
-        '<button type="button" class="story-pop-close" id="closeStoryPopBtn">×</button>' +
+        '<span class="story-pop-head-actions">' +
+          '<button type="button" class="story-pop-speak" id="storyPopSpeakBtn" title="' + (App.t('storyPopListen') || 'استمع إلى الكلمة') + '" aria-label="' + (App.t('storyPopListen') || 'استمع إلى الكلمة') + '">' +
+            '<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>' +
+          '</button>' +
+          '<button type="button" class="story-pop-close" id="closeStoryPopBtn">×</button>' +
+        '</span>' +
       '</div>' +
       '<div id="storyPopBody">' +
         (knownMeaning
-          ? '<div class="story-pop-meaning">💡 <b>' + (App.t('translationLbl') || 'الترجمة') + ':</b> ' + U.esc(knownMeaning) + '</div>'
+          ? '<div class="story-pop-meaning">' +
+              '<span class="story-pop-meaning-label">💡 ' + (App.t('translationLbl') || 'الترجمة') + '</span>' +
+              '<span class="story-pop-meaning-val" dir="auto">' + U.esc(knownMeaning) + '</span>' +
+            '</div>'
           : '<div id="storyPopAiTranslate" class="story-pop-loading"><span class="spin"></span> <span>' + (App.t('extractingTranslation') || 'جاري استخراج الترجمة...') + '</span></div>') +
         (exists ? '<div class="story-pop-success">✓ ' + (App.t('cardAlreadyExists') || 'موجودة مسبقاً في بطاقاتك') + '</div>' : '') +
         '<button type="button" class="story-pop-btn" id="createWordCardBtn">' +
@@ -740,33 +868,44 @@
 
     pop.style.display = 'block';
 
-    var rect = wordEl.getBoundingClientRect();
-    var popWidth = 280;
-    var popHeight = 170;
+    /* تحديد الموضع بقياس النافذة الفعلية (وليس تقديراً) — وإعادة التموضع بعد وصول الترجمة */
+    function positionPop() {
+      var rect = wordEl.getBoundingClientRect();
+      var popWidth = pop.offsetWidth || 380;
+      var popHeight = pop.offsetHeight || 200;
 
-    var top = rect.bottom + 8;
-    var left = rect.left;
+      var top = rect.bottom + 8;
+      var left = rect.left;
 
-    if (left + popWidth > window.innerWidth - 16) {
-      left = Math.max(16, window.innerWidth - popWidth - 16);
+      if (left + popWidth > window.innerWidth - 16) {
+        left = Math.max(16, window.innerWidth - popWidth - 16);
+      }
+      if (left < 16) left = 16;
+
+      if (top + popHeight > window.innerHeight - 16) {
+        top = Math.max(16, rect.top - popHeight - 8);
+      }
+
+      pop.style.top = top + 'px';
+      pop.style.left = left + 'px';
     }
-    if (left < 16) left = 16;
+    positionPop();
 
-    if (top + popHeight > window.innerHeight - 16) {
-      top = Math.max(16, rect.top - popHeight - 8);
-    }
-
-    pop.style.top = top + 'px';
-    pop.style.left = left + 'px';
+    /* الاستماع الفوري للكلمة عند النقر — من كاش التوليد المسبق إن وُجد (بلا انتظار السيرفر) */
+    App.tts.speak(word, 'front');
 
     if (!knownMeaning && App.ai && App.ai.translate && App.state.settings.apiKey) {
       var askedWord = word; /* لعزل السباق: ترجمة كلمة قديمة لا تغلب الكلمة المعروضة حالياً */
       App.ai.translate(word).then(function (trans) {
         if (askedWord !== currentSelectedWord || !trans) return;
+        cacheWordTranslation(askedWord, trans); /* تُخزَّن في قاموس القصة — النقرات القادمة فورية */
         var el = getEl('storyPopAiTranslate');
         if (el) {
-          el.outerHTML = '<div class="story-pop-meaning">💡 <b>' + (App.t('translationLbl') || 'الترجمة') + ':</b> ' + U.esc(trans) + '</div>';
+          el.outerHTML = '<div class="story-pop-meaning">' +
+            '<span class="story-pop-meaning-label">💡 ' + (App.t('translationLbl') || 'الترجمة') + '</span>' +
+            '<span class="story-pop-meaning-val" dir="auto">' + U.esc(trans) + '</span></div>';
         }
+        if (typeof positionPop === 'function') positionPop(); /* النافذة طالت — أعد تموضعها إن اقتربت من الحافة */
       }).catch(function () {
         if (askedWord !== currentSelectedWord) return;
         var el2 = getEl('storyPopAiTranslate');
@@ -844,6 +983,7 @@
 
         App.state.cards.push(card);
         return App.store.saveCard(card).then(function () {
+          if (App.precache) App.precache.enqueueCard(card); /* صوت بطاقة الكلمة يُولَّد في الخلفية */
           if (currentWordElement) currentWordElement.classList.add('saved-card');
           body.innerHTML =
             '<div class="story-pop-success">✓ ' + (App.t('cardAddedOk') || 'تمت إضافة البطاقة بنجاح!') + '</div>' +
@@ -861,7 +1001,7 @@
       });
     }).catch(function (err) {
       body.innerHTML =
-        '<div style="color:#ef4444;font-size:12px;margin-bottom:8px;">' + (App.t('generationFailed') || 'فشل التوليد: ') + U.esc(err && err.message ? err.message : 'خطأ') + '</div>' +
+        '<div style="color:#ef4444;font-size:12px;margin-bottom:8px;">' + (App.t('aiFailed') || 'فشل التوليد: ') + U.esc(err && err.message ? err.message : 'خطأ') + '</div>' +
         '<button type="button" class="story-pop-btn" id="createWordCardBtn"><span>' + (App.t('retry') || 'إعادة المحاولة') + '</span></button>';
     });
   }
@@ -976,6 +1116,7 @@
         });
 
         return Promise.all(saveOps).then(function () {
+          if (App.precache) newCards.forEach(function (nc) { App.precache.enqueueCard(nc); });
           App.render.renderAll();
           closeModal('storyResultModal');
           U.toast(App.tf('storyVocabConverted', { count: newCards.length, deck: storyTitle }), 'success', 5000);
@@ -1002,16 +1143,105 @@
   }
 
   /* ═════════ واجهة القصص المستقلة (Stories View Handlers) ═════════ */
+  /* صندوق الخطأ داخل صندوق الإنشاء: يبقى ظاهراً (بعكس التوست) حتى يقرأ المستخدم السبب */
+  function showStoriesGenError(msg) {
+    var box = getEl('storiesGenError');
+    if (!box) return;
+    box.textContent = msg;
+    box.style.display = 'block';
+  }
+  function hideStoriesGenError() {
+    var box = getEl('storiesGenError');
+    if (box) box.style.display = 'none';
+  }
+
+  /* شريط تقدم التوليد: مرحلة نصية + نسبة شريط + عداد ثوانٍ حي.
+     النسب تقديرية (المولد لا يعطي تقدماً حقيقياً) — الغرض أن يرى المستخدم أن
+     العمل جارٍ فعلاً وليس تجميداً، مع مرحلة أخيرة قبل ظهور القصة. */
+  var storiesGenTicker = null;
+  function setStoriesGenProgress(stageKey, pct) {
+    var wrap = getEl('storiesGenProgress');
+    if (!wrap) return;
+    wrap.style.display = 'flex';
+    var st = getEl('storiesGenStage');
+    if (st && stageKey) st.textContent = App.t(stageKey);
+    var fill = getEl('storiesGenBarFill');
+    if (fill && pct != null) {
+      fill.style.width = pct + '%';
+      fill.classList.add('active');
+    }
+  }
+  function startStoriesGenTimer() {
+    stopStoriesGenTimer();
+    var el = getEl('storiesGenElapsed');
+    if (!el) return;
+    var t0 = Date.now();
+    var tick = function () {
+      var sec = Math.round((Date.now() - t0) / 1000);
+      el.textContent = (sec >= 60)
+        ? Math.floor(sec / 60) + ' د ' + (sec % 60) + ' ث'
+        : sec + ' ث';
+    };
+    tick();
+    storiesGenTicker = setInterval(tick, 1000);
+  }
+  function stopStoriesGenTimer() {
+    if (storiesGenTicker) { clearInterval(storiesGenTicker); storiesGenTicker = null; }
+  }
+  function hideStoriesGenProgress() {
+    var wrap = getEl('storiesGenProgress');
+    if (wrap) wrap.style.display = 'none';
+    var fill = getEl('storiesGenBarFill');
+    if (fill) { fill.classList.remove('active'); fill.style.width = '0%'; }
+    stopStoriesGenTimer();
+  }
+
+  /* ═════════ آخر 10 قصص مولّدة: تُحفظ تلقائياً في الذاكرة المحلية،
+     كل قصة جديدة تُضاف في المقدمة وتُحذف الأقدم إذا تجاوزت 10 ═════════ */
+  var RECENT_STORIES_KEY = 'flashki_recent_stories';
+  var RECENT_STORIES_MAX = 10;
+
+  function addToRecentStories(story) {
+    if (!story || !story.story) return;
+    if (!story.id) story.id = U.uid();
+    if (!story.createdAt) story.createdAt = Date.now();
+    var list = (App.state.recentStories || []).filter(function (s) { return s.id !== story.id; });
+    list.unshift(JSON.parse(JSON.stringify(story)));
+    list = list.slice(0, RECENT_STORIES_MAX);
+    App.state.recentStories = list;
+    try { localStorage.setItem(RECENT_STORIES_KEY, JSON.stringify(list)); } catch (err) {}
+  }
+
+  function openRecentStory(id) {
+    var s = (App.state.recentStories || []).filter(function (x) { return x.id === id; })[0];
+    if (!s || !s.story) return;
+    stopStoryAudio();
+    hideStoryWordPopover();
+    var m = getEl('recentStoriesMenu');
+    if (m) m.style.display = 'none';
+    App.state.lastStory = JSON.parse(JSON.stringify(s));
+    try { localStorage.setItem('flashki_last_story', JSON.stringify(App.state.lastStory)); } catch (err) {}
+    App.render.renderStoriesView();
+    if (App.precache) App.precache.enqueueStory(s); /* صوت القصة المعاد فتحها يجهز في الخلفية */
+  }
+
+  function removeRecentStory(id) {
+    App.state.recentStories = (App.state.recentStories || []).filter(function (x) { return x.id !== id; });
+    try { localStorage.setItem(RECENT_STORIES_KEY, JSON.stringify(App.state.recentStories)); } catch (err) {}
+    App.render.renderStoriesView();
+  }
+
   function generateStoriesViewAi() {
     var input = getEl('storiesPromptInput');
     var text = input ? input.value.trim() : '';
     if (!text) { U.toast(App.t('aiNeedText') || 'يرجى كتابة موضوع للقصة', 'error'); return; }
     if (!App.state.settings.apiKey) { U.toast(App.t('aiNoKey'), 'error'); switchView('settings'); return; }
 
+    hideStoriesGenError();
     var btn = getEl('storiesDoGenerateBtn');
     var lbl = getEl('storiesGenBtnLabel');
-    if (btn) btn.disabled = true;
-    if (lbl) lbl.textContent = 'جاري كتابة القصة وتوليد المفردات...';
+    if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+    if (lbl) lbl.textContent = App.t('storyStage2');
 
     var cefrSel = getEl('storiesCefrSelect');
     if (cefrSel && App.state.profile) {
@@ -1019,27 +1249,39 @@
       App.store.saveProfile(App.state.profile);
     }
 
+    setStoriesGenProgress('storyStage1', 12);
+    startStoriesGenTimer();
+    /* النموذج يستغرق عادة عشرات الثواني للقصة الكاملة — إن تجاوزت 8 ثوانٍ
+       انتقل نصياً لمرحلة الكتابة ليطابق الواقع */
+    var stage2Timer = setTimeout(function () { setStoriesGenProgress('storyStage2', 55); }, 8000);
+
     App.ai.generateStory(text).then(function (story) {
+      setStoriesGenProgress('storyStage3', 88);
       App.state.lastStory = story;
+      addToRecentStories(story); /* يعيّن id + createdAt ويقصّ القائمة لآخر 3 قصص */
       try { localStorage.setItem('flashki_last_story', JSON.stringify(story)); } catch (err) {}
       App.render.renderStoriesView();
       U.toast('✓ تم توليد القصة بنجاح!', 'success');
+      if (App.precache) App.precache.enqueueStory(story); /* صوت القصة الكامل ثم كلماتها — في الخلفية فوراً */
       var creator = getEl('viewStoriesCreator');
       if (creator) creator.style.display = 'none';
       if (input) input.value = '';
     }).catch(function (e) {
-      var m = e && e.message ? String(e.message) : '';
-      var msg = (App.ai && App.ai.isBusyError && App.ai.isBusyError(m))
-        ? App.t('aiBusy') + (m ? ' — ' + m : '')
-        : ((e && e.message) ? App.t('aiFailed') + e.message : App.t('aiFailed'));
-      U.toast(msg, 'error', 6000);
+      var msg = aiFailMsg(e);
+      U.toast(msg, 'error', 8000);
+      showStoriesGenError(msg);
     }).then(function () {
-      if (btn) btn.disabled = false;
+      clearTimeout(stage2Timer);
+      hideStoriesGenProgress();
+      if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
       if (lbl) lbl.textContent = App.t('storiesGenBtn');
     });
   }
 
   function openStoryCreator() {
+    hideStoriesGenError();
+    var pt = getEl('pageTitle');
+    if (pt) pt.textContent = App.t('navStories');
     var creator = getEl('viewStoriesCreator');
     var reader = getEl('viewStoriesReader');
     var empty = getEl('viewStoriesEmpty');
@@ -1050,6 +1292,72 @@
     }
     if (reader) reader.style.display = 'none';
     if (empty) empty.style.display = 'none';
+  }
+
+  /* ═════════ تعديل القصة الحالية (Stories View) ═════════
+     زر بجانب "ترجمة بالجمل" و"استمع": يحوّل نص القصة إلى textarea عادي —
+     المستخدم يحذف/يضيف ما يريد ثم "حفظ" فيُعرض التعديل ويكمل مع القصة كالسابق
+     (جمل الترجمة السطرية تُعاد محلياً حسب النص الجديد عبر pairStorySentences) */
+  function enterStoryEditMode() {
+    var st = App.state.lastStory;
+    if (!st || !st.story) { U.toast(App.t('aiNeedText'), 'error'); return; }
+    stopStoryAudio();
+    hideStoryWordPopover();
+    var ta = getEl('storiesEditTextarea');
+    if (ta) {
+      ta.value = st.story || '';
+      /* اتجاه التحرير يتبع لغة القصة */
+      var pr = App.state.profile || {};
+      var isTargetRtl = (pr.targetLang === 'ar' || pr.targetLang === 'ur' || pr.targetLang === 'fa');
+      ta.setAttribute('dir', isTargetRtl ? 'rtl' : 'ltr');
+      ta.style.textAlign = isTargetRtl ? 'right' : 'left';
+    }
+    ['storiesTargetCard', 'storiesNativeWrapper', 'storiesVocabSection'].forEach(function (id) {
+      var el = getEl(id);
+      if (el) el.style.display = 'none';
+    });
+    var bottom = document.querySelector('#viewStoriesReader .stories-bottom-actions');
+    if (bottom) bottom.style.display = 'none';
+    var tools = document.querySelector('#viewStoriesReader .stories-toolbar-tools');
+    if (tools) tools.style.display = 'none';
+    var card = getEl('storiesEditCard');
+    if (card) card.style.display = 'block';
+    var eb = getEl('storiesEditStoryBtn');
+    if (eb) eb.classList.add('active');
+    if (ta) { ta.focus(); }
+  }
+
+  function exitStoryEditMode() {
+    var card = getEl('storiesEditCard');
+    if (card) card.style.display = 'none';
+    /* إعادة بطاقات القراءة التي أخفاها enterStoryEditMode — من دون هذا تبقى
+       بطاقة نص القصة (لغة التعلم) مخفية بعد أول حفظ/إلغاء */
+    ['storiesTargetCard', 'storiesNativeWrapper', 'storiesVocabSection'].forEach(function (id) {
+      var el = getEl(id);
+      if (el) el.style.display = '';
+    });
+    var tools = document.querySelector('#viewStoriesReader .stories-toolbar-tools');
+    if (tools) tools.style.display = '';
+    var bottom = document.querySelector('#viewStoriesReader .stories-bottom-actions');
+    if (bottom) bottom.style.display = '';
+    var eb = getEl('storiesEditStoryBtn');
+    if (eb) eb.classList.remove('active');
+  }
+
+  function saveStoryEdit() {
+    var st = App.state.lastStory;
+    var ta = getEl('storiesEditTextarea');
+    if (!st || !ta) return;
+    var newText = ta.value.trim();
+    if (!newText) { U.toast(App.t('aiNeedText'), 'error'); return; }
+    exitStoryEditMode();
+    if (newText !== String(st.story || '').trim()) {
+      st.story = newText;
+      st.sentences = []; /* تُقسم من جديد محلياً حسب النص الجديد */
+      try { localStorage.setItem('flashki_last_story', JSON.stringify(st)); } catch (err) {}
+      U.toast(App.t('storyEditSaved') || 'تم حفظ تعديلات القصة ✓', 'success');
+    }
+    App.render.renderStoriesView();
   }
 
   /* ═════════ إدارة وتعديل كلمات القسم المختار (Deck Cards Modal) ═════════ */
@@ -1191,6 +1499,7 @@
       delete inlineCardImages[cardId];
       return App.store.saveCard(c);
     }).then(function () {
+      if (App.precache) App.precache.enqueueCard(c); /* النص تغيّر ربما — حدّث صوتها المخزن */
       U.toast(App.t('savedOk') || '✓ تم حفظ التعديل بنجاح', 'success');
       var search = (getEl('deckCardsSearchInput') || {}).value || '';
       App.render.renderDeckCardsList(App.state.managingDeckId, search);
@@ -1349,8 +1658,10 @@
     var genInfo = App.state.aiGenInfo || {};
     var genId = U.uid();
     (wantNew ? createAiDeck() : ensureDeck(deckId)).then(function (resolvedDeckId) {
+      var created = [];
       var ops = sel.map(function (c, i) {
         var card = { id: U.uid(), deckId: resolvedDeckId, front: c.front, back: c.back, tags: c.tags || [], cefr: c.cefr || null, example: c.example || '', exampleTranslation: c.exampleTranslation || '', generatedFrom: genId, srs: App.srs.newState(now), createdAt: now + i, updatedAt: now, audioFront: undefined, audioBack: undefined };
+        created.push(card);
         App.state.cards.push(card);
         return App.store.saveCard(card);
       });
@@ -1361,6 +1672,7 @@
         cardsCount: sel.length, promptUsed: genInfo.prompt || '', createdAt: now
       }));
       return Promise.all(ops).then(function () {
+        if (App.precache) created.forEach(function (cc) { App.precache.enqueueCard(cc); }); /* أصوات البطاقات الجديدة في الخلفية */
         closeModal('aiResultModal');
         App.state.aiResults = [];
         getEl('aiText').value = '';
@@ -1480,10 +1792,29 @@
     App.store.exportData().then(function (data) {
       return App.store.exportWithAudio(data);
     }).then(function (data) {
-      var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      var json = JSON.stringify(data, null, 2);
+      var name = 'flashki-backup-' + U.todayKey() + '.json';
+      /* داخل التطبيق: حفظ مباشر في مجلد التنزيلات — وسم <a download> لا يعمل في webview تورّي */
+      if (isTauri()) {
+        return window.__TAURI__.core.invoke('save_export_file', { fileName: name, contents: json }).then(function (p) {
+          U.toast(App.t('exportedOkFile') + ' — ' + p, 'success', 9000);
+        });
+      }
+      /* أندرويد: حفظ عبر الجسر الأصلي في Download/Flashki (MediaStore — بلا أذونات) */
+      if (window.FlashkiAndroid && typeof window.FlashkiAndroid.saveExportFile === 'function') {
+        var b64 = btoa(unescape(encodeURIComponent(json)));
+        var savedPath = window.FlashkiAndroid.saveExportFile(name, b64);
+        if (savedPath) {
+          U.toast(App.t('exportedOkFile') + ' — ' + savedPath, 'success', 9000);
+          return;
+        }
+        U.toast(App.t('importFailed') || 'فشل حفظ الملف', 'error');
+        return;
+      }
+      var blob = new Blob([json], { type: 'application/json' });
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'flashki-backup-' + U.todayKey() + '.json';
+      a.download = name;
       document.body.appendChild(a);
       a.click();
       setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
@@ -1510,6 +1841,7 @@
         App.i18n.applyLang(App.state.settings.lang || 'ar');
         App.render.renderAll();
         if (App.render.updateLangLabels) App.render.updateLangLabels();
+        if (App.precache) App.precache.scanAndQueue(); /* البطاقات المستوردة تحتاج أصواتها */
         U.toast(App.t('importedOk'), 'success');
       }).catch(function (err) {
         console.error('Import error:', err);
@@ -1522,12 +1854,18 @@
   function doWipe() {
     if (!confirm(App.t('wipeConfirm1'))) return;
     if (!confirm(App.t('wipeConfirm2'))) return;
-    App.store.wipeAll().then(function () { location.reload(); });
+    /* داخل التطبيق: حذف ملفات المستخدم (صور البطاقات) قبل تفريغ قاعدة البيانات */
+    var purged = isTauri()
+      ? window.__TAURI__.core.invoke('purge_user_files').catch(function (e) { console.warn('purge images failed', e); })
+      : Promise.resolve();
+    purged.then(function () { return App.store.wipeAll(); })
+      .then(function () { return App.db.flush(); }) /* حفظ فوري — الإعادة قبل مؤقت الاستمرار تفقد أثر الحذف */
+      .then(function () { location.reload(); });
   }
 
   /* ---------- theme / settings ---------- */
   function applyTheme() {
-    var theme = App.state.settings.theme || 'dark';
+    var theme = App.state.settings.theme || 'light';
     document.body.classList.remove('light', 'dark');
     document.body.classList.add(theme);
     document.body.classList.toggle('no-anim', !App.state.settings.animations);
@@ -1666,7 +2004,28 @@
   }
 
   /* ---------- init ---------- */
+  /* عنوان زر ☰ يتغير حسب الشاشة: «آخر القصص» على الهاتف/الشاشة الضيقة،
+     «إظهار/إخفاء القائمة الجانبية» على سطح المكتب — ويُستدعى من switchView وresize وapplyLang */
+  function updateStoriesToggleUi() {
+    var btn = getEl('sidebarToggleBtn');
+    if (!btn) return;
+    var narrow = window.matchMedia('(max-width: 1100px)').matches;
+    var title = narrow ? App.t('recentStories') : App.t('toggleSidebar');
+    btn.title = title;
+    btn.setAttribute('aria-label', title);
+  }
+
   function init() {
+    /* زر ☰ في عرض القصص: تبديل الأيقونة/العنوان عند تغيير حجم النافذة
+       + إغلاق قائمة آخر القصص المنسدلة إن انتقلت للعرض العريض (فيه اللوحة اليسرى) */
+    window.addEventListener('resize', U.debounce(function () {
+      updateStoriesToggleUi();
+      var m = getEl('recentStoriesMenu');
+      if (m && !window.matchMedia('(max-width: 1100px)').matches && m.style.display !== 'none') {
+        m.style.display = 'none';
+      }
+    }, 120));
+
     /* رابط Google AI Studio + زر تحميل التطبيق: في Tauri يفتحان بالمتصفح الخارجي */
     ['aiStudioLink', 'downloadAppBtn'].forEach(function (id) {
       var el = getEl(id);
@@ -1809,16 +2168,32 @@
         return;
       }
 
-      /* زر إخفاء وإظهار الشريط الجانبي */
+      /* زر القائمة (☰) في عرض القصص فقط:
+         شاشة عريضة (>1100px) → إظهار/إخفاء القائمة الجانبية (آخر القصص ظاهرة دائماً في اللوحة اليسرى)
+         هاتف/شاشة ضيقة (≤1100px) → فتح قائمة آخر القصص المنسدلة */
       if (t.closest('#sidebarToggleBtn')) {
         e.preventDefault();
-        var appEl = getEl('app');
-        if (appEl) appEl.classList.toggle('sidebar-hidden');
+        if (window.matchMedia('(max-width: 1100px)').matches) {
+          var menuEl = getEl('recentStoriesMenu');
+          if (menuEl) {
+            var show = menuEl.style.display === 'none' || !menuEl.style.display;
+            if (show) App.render.renderRecentStories();
+            menuEl.style.display = show ? 'block' : 'none';
+          }
+        } else {
+          var appEl = getEl('app');
+          if (appEl) {
+            var nowHidden = appEl.classList.toggle('sidebar-hidden');
+            App.state.storiesSidebarHidden = nowHidden;
+          }
+        }
         return;
       }
+      /* فتح/حذف قصة من قائمة آخر القصص يُعالج في قسم data-action العام أدناه */
 
-      /* فحص التحديثات */
+      /* فحص التحديثات + تثبيتها */
       if (t.closest('#checkUpdateBtn')) { e.preventDefault(); checkAppUpdate(); return; }
+      if (t.closest('#installUpdateBtn')) { e.preventDefault(); installPendingUpdate(); return; }
 
       /* حجم الخط +/- */
       if (t.closest('#fontSizeMinus')) { e.preventDefault(); nudgeFontSize(-2); return; }
@@ -1834,6 +2209,14 @@
       if (t.closest('#storiesToggleInterlinearBtn')) {
         e.preventDefault();
         App.state.interlinearStoryMode = !App.state.interlinearStoryMode;
+        App.render.renderStoriesView();
+        return;
+      }
+      if (t.closest('#storiesEditStoryBtn')) { e.preventDefault(); enterStoryEditMode(); return; }
+      if (t.closest('#storiesEditSaveBtn')) { e.preventDefault(); saveStoryEdit(); return; }
+      if (t.closest('#storiesEditCancelBtn')) {
+        e.preventDefault();
+        exitStoryEditMode();
         App.render.renderStoriesView();
         return;
       }
@@ -1853,11 +2236,17 @@
         return;
       }
       if (t.closest('#createWordCardBtn')) { e.preventDefault(); convertWordToCard(); return; }
+      if (t.closest('#storyPopSpeakBtn')) { e.preventDefault(); if (currentSelectedWord) App.tts.speak(currentSelectedWord, 'front'); return; }
       if (t.closest('#closeStoryPopBtn')) { e.preventDefault(); hideStoryWordPopover(); return; }
       var storyWordEl = t.closest('.story-word');
       if (storyWordEl) { e.preventDefault(); e.stopPropagation(); openStoryWordPopover(storyWordEl); return; }
       if (!t.closest('#storyWordPopover') && !t.closest('.story-word')) {
         hideStoryWordPopover();
+      }
+      /* إغلاق قائمة آخر القصص عند الضغط خارجها */
+      if (!t.closest('#recentStoriesMenu') && !t.closest('#sidebarToggleBtn')) {
+        var rsm = getEl('recentStoriesMenu');
+        if (rsm && rsm.style.display !== 'none') rsm.style.display = 'none';
       }
 
       /* 6) add tabs */
@@ -1902,13 +2291,32 @@
       var toggle = t.closest('.toggle');
       if (toggle) {
         var id = toggle.id;
-        if (id === 'autoTtsToggle' || id === 'animationsToggle' || id === 'autoTwoSidedToggle' || id === 'translateToggle') {
+        if (id === 'autoTtsToggle' || id === 'animationsToggle' || id === 'autoTwoSidedToggle' || id === 'translateToggle' || id === 'ttsPrecacheToggle') {
           toggle.classList.toggle('on');
-          var key = id === 'autoTtsToggle' ? 'autoTts' : (id === 'animationsToggle' ? 'animations' : (id === 'translateToggle' ? 'translationAutoEnabled' : 'autoTwoSided'));
+          var key = id === 'autoTtsToggle' ? 'autoTts' : (id === 'animationsToggle' ? 'animations' : (id === 'translateToggle' ? 'translationAutoEnabled' : (id === 'ttsPrecacheToggle' ? 'ttsPrecache' : 'autoTwoSided')));
           App.state.settings[key] = toggle.classList.contains('on');
           if (key === 'animations') applyTheme();
           if (key === 'translationAutoEnabled') App.render.updateTranslateBtnVisibility();
+          if (key === 'ttsPrecache') {
+            if (App.precache) {
+              if (App.state.settings.ttsPrecache === false) App.precache.reset();
+              else App.precache.scanAndQueue(); /* أُعيد تشغيله — امسح ما ينقص فوراً */
+            }
+          }
           persistSettings();
+          return;
+        }
+        /* إشعارات المراجعة: تعطيل/تفعيل منبهات النظام عبر الطبقة الأصلية */
+        if (id === 'notificationsToggle') {
+          toggle.classList.toggle('on');
+          var wantOn = toggle.classList.contains('on');
+          var applyNotif = function () {
+            if (App.setNotificationsEnabled) App.setNotificationsEnabled(wantOn);
+            else if (App.store && App.store.saveSettings) { App.state.settings.notifications = wantOn; App.store.saveSettings(App.state.settings); }
+          };
+          if (wantOn && App.androidPerms && App.androidPerms.notif) {
+            App.androidPerms.notif().then(applyNotif);
+          } else applyNotif();
           return;
         }
       }
@@ -1937,6 +2345,16 @@
           e.preventDefault();
           if (App.state.lastView !== 'stories') App.switchView('stories');
           openStoryCreator();
+          return;
+        }
+        if (action === 'open-recent-story') {
+          e.preventDefault(); e.stopPropagation();
+          openRecentStory(act.getAttribute('data-id'));
+          return;
+        }
+        if (action === 'remove-recent-story') {
+          e.preventDefault(); e.stopPropagation();
+          removeRecentStory(act.getAttribute('data-id'));
           return;
         }
         if (action === 'manage-deck-cards') {
@@ -2134,6 +2552,21 @@
         saveKeyWithValidation();
         return;
       }
+      /* زر إظهار/إخفاء مفتاح API — تبديل نوع الحقل مع تغيير الأيقونة والعنوان */
+      if (t.closest('#apiKeyEyeBtn')) {
+        e.preventDefault();
+        var keyInput = getEl('apiKeyInput');
+        var eyeBtn = getEl('apiKeyEyeBtn');
+        if (keyInput && eyeBtn) {
+          var reveal = keyInput.type === 'password';
+          keyInput.type = reveal ? 'text' : 'password';
+          eyeBtn.classList.toggle('revealed', reveal);
+          var eyeTitle = reveal ? App.t('keyHide') : App.t('keyShow');
+          eyeBtn.title = eyeTitle;
+          eyeBtn.setAttribute('aria-label', eyeTitle);
+        }
+        return;
+      }
       if (t.closest('#deleteKeyBtn')) {
         var delBtn = getEl('deleteKeyBtn');
         if (delBtn && !delBtn.disabled) showModal('deleteKeyModal');
@@ -2169,7 +2602,15 @@
       var navBtn = t.closest('button[data-view]');
       if (navBtn && !navBtn.hasAttribute('data-open-session') && !navBtn.closest('.deck-card') && !navBtn.closest('.picker-card')) {
         e.preventDefault();
-        switchView(navBtn.getAttribute('data-view'));
+        var targetView = navBtn.getAttribute('data-view');
+        switchView(targetView);
+        /* فتح البحث من أيقونة المكبر → تركّز الحقل فوراً جاهزاً للكتابة */
+        if (targetView === 'search' && navBtn.id === 'searchToggleBtn') {
+          setTimeout(function () {
+            var si = getEl('searchInput');
+            if (si) { si.focus(); si.select(); }
+          }, 60);
+        }
         return;
       }
     });
@@ -2193,6 +2634,11 @@
       } else if (el.id === 'modelSelect') {
         App.state.settings.model = el.value;
         persistSettings();
+        U.toast(App.t('settingsSaved'), 'success');
+      } else if (el.id === 'ttsEngineSelect') {
+        App.state.settings.ttsEngine = el.value;
+        persistSettings();
+        updateTtsDiagnostics();
         U.toast(App.t('settingsSaved'), 'success');
       } else if (el.id === 'aiTargetLangSelect') {
         if (!App.state.profile) App.state.profile = {};
@@ -2233,8 +2679,8 @@
       } else if (el.id === 'importFile' && el.files && el.files[0]) {
         doImport(el.files[0]);
         el.value = '';
-      } else if (el.id === 'ttsRate') {
-        App.state.settings.ttsRate = parseFloat(el.value) || 1;
+      } else if (el.id === 'ttsRate' || el.id === 'ttsRateNative') {
+        App.state.settings[el.id] = parseFloat(el.value) || 1;
         persistSettings();
       }
     });
@@ -2255,8 +2701,8 @@
         /* زر حذف المفتاح يتبع حالة الحقل حياً */
         if (App.render.updateKeyButtons) App.render.updateKeyButtons();
       }
-      else if (el.id === 'ttsRate') {
-        App.state.settings.ttsRate = parseFloat(el.value) || 1;
+      else if (el.id === 'ttsRate' || el.id === 'ttsRateNative') {
+        App.state.settings[el.id] = parseFloat(el.value) || 1;
       }
     });
 
@@ -2285,6 +2731,33 @@
     });
   }
 
+  /* تشخيص نطق الهاتف: صف يظهر على أندرويد فقط — يعرض جاهزية المحرك،
+     عدد الأصوات، واللغات المغطاة فعلياً كي يعرف المستخدم ما سيعمل أوفلاين */
+  function updateTtsDiagnostics() {
+    var row = getEl('ttsDiagRow');
+    var txt = getEl('ttsDiagText');
+    if (!row || !txt) return;
+    var isAndroidShell = !!(window.FlashkiAndroid && typeof window.FlashkiAndroid.ttsSynthesize === 'function');
+    if (!isAndroidShell) { row.style.display = 'none'; return; }
+    row.style.display = '';
+    txt.textContent = '…';
+    var tries = 0;
+    (function probe() {
+      var info = App.tts && App.tts.nativeInfo ? App.tts.nativeInfo() : null;
+      if (!info || info.ready === null) {
+        if (tries++ < 10) { setTimeout(probe, 900); return; }
+        txt.textContent = App.t('ttsDiagUnknown');
+        return;
+      }
+      if (!info.ready) { txt.textContent = App.t('ttsDiagNoEngine'); return; }
+      var langs = (info.langs || []);
+      txt.textContent = App.t('ttsDiagOk')
+        .replace('{voices}', String(info.voices || 0))
+        .replace('{langs}', langs.length ? langs.join(' · ') : '—');
+      App.tts.loadVoices(); /* تحديث الكشف إن كان المحرك جهز بعد الفحص الأول */
+    })();
+  }
+
   App.handlers = {
     init: init,
     applyTheme: applyTheme,
@@ -2296,8 +2769,11 @@
     setAiMode: setAiMode,
     imagePathToSrc: imagePathToSrc,
     formatStoryWithWords: formatStoryWithWords,
+    exitStoryEditMode: exitStoryEditMode,
     applyStoriesViewFontSize: applyStoryFontSize,
     openStoryCreator: openStoryCreator,
+    updateTtsDiagnostics: updateTtsDiagnostics,
+    updateStoriesToggleUi: updateStoriesToggleUi,
     _internal: { saveManualCard: saveManualCard, doExport: doExport, generateAi: generateAi, generateStoryAi: generateStoryAi, checkAppUpdate: checkAppUpdate, nudgeFontSize: nudgeFontSize }
   };
   App.updateAiModeUi = updateAiModeUi;

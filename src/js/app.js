@@ -21,6 +21,8 @@
     aiOptions: { count: 'auto', twosided: false, context: true },
     aiMode: 'cards',
     lastStory: null,
+    recentStories: [],
+    storiesSidebarHidden: false, /* حالة إخفاء الشريط الجانبي في عرض القصص (سطح المكتب) */
     aiResults: [],
     session: null,
     settings: {},
@@ -55,6 +57,23 @@
     var app = U.getEl('app');
     if (isStudy) app.classList.add('studying');
     else app.classList.remove('studying');
+    /* نافذة معنى الكلمة position:fixed — تخفى عند مغادرة عرض القصص كي لا تبقى عائمة فوق عرض آخر */
+    if (view !== 'stories') {
+      var wp = document.getElementById('storyWordPopover');
+      if (wp) wp.style.display = 'none';
+      var rm = document.getElementById('recentStoriesMenu');
+      if (rm) rm.style.display = 'none';
+    }
+    /* زر القائمة (☰) يظهر فقط في عرض القصص — فيه قائمة آخر القصص (طلب المستخدم) */
+    var topbar = document.querySelector('.topbar');
+    if (topbar) topbar.classList.toggle('stories-mode', view === 'stories');
+    /* في عرض القصص على الشاشات العريضة: الزر يظهر/يخفي الشريط الجانبي — الحالة تُستعاد عند العودة
+       وتُلغى في بقية الأقسام كي لا يبقى الشريط مخفياً بلا زر لإظهاره */
+    if (app) {
+      if (view === 'stories') app.classList.toggle('sidebar-hidden', !!App.state.storiesSidebarHidden);
+      else app.classList.remove('sidebar-hidden');
+    }
+    if (App.handlers && App.handlers.updateStoriesToggleUi) App.handlers.updateStoriesToggleUi();
     App.i18n.updateTitle(view);
 
     var quickAddBtn = U.getEl('quickAddBtn');
@@ -215,6 +234,8 @@
       App.state.session = null;
       App.render.renderAll();
       App.switchView('session-end');
+      /* الجلسة غيّرت أوقات الاستحقاق — حدّث منبه المراجعة القادم */
+      if (App.syncReminders) setTimeout(function () { App.syncReminders(true); }, 400);
     },
 
     exit: function () {
@@ -297,17 +318,33 @@
       })
       .then(function () { return cleanupLegacySeeds(); })
       .then(function () {
+        /* الافتراضي الآن الوضع الفاتح — ترحيل لمرة واحدة: من كان لديه داكن محفوظ
+           (افتراضي قديم وليس اختياراً واعياً) ينتقل للفاتح، واختياره اللاحق يبقى محفوظاً */
+        try {
+          if (!localStorage.getItem('flashki_theme_default_v2')) {
+            localStorage.setItem('flashki_theme_default_v2', '1');
+            App.state.settings.theme = 'light';
+            App.store.saveSettings(App.state.settings);
+          }
+        } catch (e) {}
         App.handlers.applyTheme();
         App.i18n.applyLang(App.state.settings.lang || 'ar');
         if (App.state.settings.aiCount) App.state.aiOptions.count = App.state.settings.aiCount;
         App.render.renderAll();
         App.handlers.init();
         App.tts.loadVoices();
+        if (App.precache) App.precache.boot(); /* التوليد المسبق للأصوات — يبدأ بعد مهلة قصيرة في الخلفية */
 
         /* استعادة القصة المحفوظة إن وجدت */
         try {
           var ls = localStorage.getItem('flashki_last_story');
           if (ls) App.state.lastStory = JSON.parse(ls);
+        } catch (e) {}
+
+        /* آخر 3 قصص مولّدة (القائمة الجانبية في عرض القصص) */
+        try {
+          var rs = localStorage.getItem('flashki_recent_stories');
+          if (rs) App.state.recentStories = JSON.parse(rs);
         } catch (e) {}
 
         /* استعادة الواجهة الأخيرة عند إعادة التحديث */
@@ -317,6 +354,8 @@
           if (v && ['study', 'session-end'].indexOf(v) < 0) savedView = v;
         } catch (e) {}
         App.switchView(savedView);
+        /* مزامنة منبه المراجعة بعد اكتمال تحميل البطاقات */
+        if (App.syncReminders) setTimeout(function () { App.syncReminders(true); }, 1500);
 
         /* Onboarding أول مرة فقط */
         if (!App.state.profile.onboardingCompletedAt) {

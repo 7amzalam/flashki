@@ -18,6 +18,7 @@ async fn gemini_generate(
     json_mode: Option<bool>,
     schema: Option<serde_json::Value>,
     use_thinking: Option<bool>,
+    max_tokens: Option<u32>,
 ) -> Result<serde_json::Value, String> {
     let model = model.trim().to_string();
     if model.is_empty() || !model.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '.') {
@@ -36,6 +37,7 @@ async fn gemini_generate(
         json_mode.unwrap_or(true),
         schema,
         use_thinking.unwrap_or(true),
+        max_tokens,
     )
     .await?;
     Ok(json!({ "text": text, "usage": usage }))
@@ -135,6 +137,51 @@ fn load_card_image(app: tauri::AppHandle, path: String) -> Result<String, String
     Ok(format!("data:{};base64,{}", mime, b64))
 }
 
+/* حفظ ملف التصدير في مجلد التنزيلات — وسم <a download> لا يعمل في webview تورّي */
+#[tauri::command]
+fn save_export_file(
+    app: tauri::AppHandle,
+    file_name: String,
+    contents: String,
+) -> Result<String, String> {
+    let ok_name = !file_name.contains("..")
+        && file_name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
+    if !ok_name {
+        return Err("invalid file name".into());
+    }
+    let dir = app
+        .path()
+        .download_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(&file_name);
+    std::fs::write(&path, contents).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+/* تفريغ ملفات المستخدم عند «حذف كل البيانات»: يحذف مجلد صور البطاقات بالكامل */
+#[tauri::command]
+fn purge_user_files(app: tauri::AppHandle) -> Result<(), String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("images");
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/* إعادة تشغيل التطبيق بعد تثبيت تحديث (يستدعيها updater في الإعدادات) */
+#[tauri::command]
+fn restart_app(app: tauri::AppHandle) {
+    app.restart();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -149,7 +196,10 @@ pub fn run() {
             gemini_generate,
             edge_tts_synthesize,
             save_card_image,
-            load_card_image
+            load_card_image,
+            save_export_file,
+            purge_user_files,
+            restart_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

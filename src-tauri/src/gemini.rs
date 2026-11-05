@@ -7,6 +7,7 @@ use serde_json::json;
 const GEMINI_BASE: &str = "https://generativelanguage.googleapis.com/v1beta/models";
 
 /* json_mode: responseMimeType=application/json (+ responseSchema اختياري).
+   max_tokens: القصة تحتاج أكثر من 4096 رمز (قصة + ترجمة + جمل + مفردات) وإلا قُطع الرد.
    يعيد (نص_الرد, usageMetadata) — lib.rs يغلّفهما كائن JSON للواجهة. */
 pub async fn generate(
     api_key: &str,
@@ -15,11 +16,13 @@ pub async fn generate(
     json_mode: bool,
     schema: Option<serde_json::Value>,
     use_thinking: bool,
+    max_tokens: Option<u32>,
 ) -> Result<(String, serde_json::Value), String> {
     let url = format!("{}/{}:generateContent", GEMINI_BASE, model);
+    let max_out = max_tokens.unwrap_or(4096).clamp(256, 32768);
     let mut gc = json!({
         "temperature": 0.4,
-        "maxOutputTokens": 4096
+        "maxOutputTokens": max_out
     });
     /* thinkingBudget=0 يوقف "التفكير" على 2.5+ — بدونه يلتهم النموذج الرموز في
        thoughtsTokenCount ويعيد نصاً فارغاً (finishReason=MAX_TOKENS) */

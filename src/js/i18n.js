@@ -18,7 +18,8 @@
   var ready = new Promise(function (res) { readyResolve = res; });
 
   function loadJson(code) {
-    return fetch('i18n/' + code + '.json').then(function (r) {
+    /* ?v= لكسر كاش المتصفح عند نشر نسخة جديدة من القواميس */
+    return fetch('i18n/' + code + '.json?v=32').then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     }).then(function (json) { dicts[code] = json || {}; })
@@ -85,6 +86,10 @@
     if (App.render && App.render.updateLangLabels) App.render.updateLangLabels();
     if (App.updateAiModeUi) App.updateAiModeUi(); /* مزامنة وضع بطاقات/قصة بعد تغيير لغة الواجهة */
     if (App.render && App.render.renderStoriesView && App.state.lastView === 'stories') App.render.renderStoriesView();
+    /* عنوان زر ☰ في عرض القصص يتبع اللغة الجديدة (آخر القصص / إظهار الشريط الجانبي) */
+    if (App.handlers && App.handlers.updateStoriesToggleUi) App.handlers.updateStoriesToggleUi();
+    /* نصوص إشعارات المنبه (تعمل والتطبيق مغلق) تُرسم للطبقة الأصلية بلغة الواجهة الجديدة */
+    if (App.sendReminderTexts) { try { App.sendReminderTexts(); } catch (e) {} }
   }
 
   function updateTitle(view) {

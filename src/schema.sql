@@ -92,6 +92,21 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 
+-- ---------- كاش الصوت المولد مسبقاً (Edge TTS مجاني — يُعاد توليده إن حُذف) ----------
+-- cache_key = بصمة (voice|rate|text) — يُشغَّل الصوت فوراً من هنا بدل انتظار السيرفر
+CREATE TABLE IF NOT EXISTS audio_cache (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  cache_key   TEXT NOT NULL UNIQUE,
+  kind        TEXT NOT NULL DEFAULT 'card' CHECK (kind IN ('card','story','word','speak')),
+  ref_id      TEXT,
+  voice       TEXT,
+  rate        TEXT,
+  source_text TEXT,
+  audio_b64   TEXT NOT NULL,
+  bytes       INTEGER DEFAULT 0,
+  created_at  INTEGER NOT NULL
+);
+
 -- ---------- البيانات الوصفية (schema_version إلخ) ----------
 CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,

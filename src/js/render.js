@@ -676,6 +676,20 @@
     U.getEl('autoTtsToggle').classList.toggle('on', !!s.autoTts);
     U.getEl('animationsToggle').classList.toggle('on', !!s.animations);
     U.getEl('autoTwoSidedToggle').classList.toggle('on', !!s.autoTwoSided);
+    var pcT = U.getEl('ttsPrecacheToggle');
+    if (pcT) pcT.classList.toggle('on', s.ttsPrecache !== false); /* مفعّل افتراضياً */
+    var ntT = U.getEl('notificationsToggle');
+    if (ntT) ntT.classList.toggle('on', s.notifications !== false); /* مفعّل افتراضياً */
+    /* محرك النطق: على أندرويد قائمة فعلية + تشخيص؛ على سطح المكتب صف المحرك فقط يُخفى.
+       ⚠️ إصلاح: كان الكود القديم يخفي «البلوك كاملاً» عبر parentElement.parentElement —
+       فتختفي سرعتا النطق وقوائم الأصوات من الإعدادات كلياً (إعدادات «محذوفة بالخطأ») */
+    var isAndroidShell = !!(window.FlashkiAndroid && window.FlashkiAndroid.ttsSynthesize);
+    var engRow = U.getEl('ttsEngineRow');
+    var engSel = U.getEl('ttsEngineSelect');
+    if (engRow) {
+      engRow.style.display = isAndroidShell ? '' : 'none';
+      if (engSel) engSel.value = (s.ttsEngine === 'phone' || s.ttsEngine === 'edge') ? s.ttsEngine : 'auto';
+    }
     U.getEl('dailyNewInput').value = s.dailyNew;
     /* حجم الخط: stepper — القيمة الحالية px */
     var fsz = parseInt(s.fontSize, 10);
@@ -690,8 +704,14 @@
       ub.title = isBrowserMode ? App.t('updateBrowserHint') : '';
       ub.style.opacity = isBrowserMode ? '0.5' : '';
     }
+    /* تشخيص نطق الهاتف (أندرويد فقط) */
+    if (App.handlers && App.handlers.updateTtsDiagnostics) App.handlers.updateTtsDiagnostics();
+    /* استعادة حالة التحديث: إن وُجد تحديث بانتظار التثبيت أظهر الزر وحالة النص */
+    var upPending = !!(App.updateUI && App.updateUI.pending());
     var us = U.getEl('updateStatus');
-    if (us) us.textContent = App.t('updateSub');
+    if (us) us.textContent = upPending ? (App.t('updateAvailable') + ' — v' + App.updateUI.version()) : App.t('updateSub');
+    var iub = U.getEl('installUpdateBtn');
+    if (iub) iub.style.display = upPending ? '' : 'none';
     /* اللغات والمستوى */
     fillLangSelect(U.getEl('nativeLangSelect'), p.nativeLang || 'ar');
     fillLangSelect(U.getEl('targetLangSelect'), p.targetLang || 'en');
@@ -700,7 +720,7 @@
     /* أصوات TTS لكل لغة */
     fillVoiceSelect(U.getEl('voiceTargetSelect'), p.targetLang || 'en', s['tts_voice_' + (p.targetLang || 'en')]);
     fillVoiceSelect(U.getEl('voiceNativeSelect'), p.nativeLang || 'ar', s['tts_voice_' + (p.nativeLang || 'ar')]);
-    /* سرعة النطق — تُطبَّق على نطق لغة الهدف: البطاقات والقصص (ratePct في tts.js) */
+    /* سرعتا النطق — ttsRate للغة الهدف (البطاقات والقصص) و ttsRateNative للغة الأم (الترجمات) */
     var rr = U.getEl('ttsRate');
     if (rr) {
       var r0 = Number(s.ttsRate);
@@ -708,6 +728,14 @@
       rr.value = r0;
       var rv = rr.parentElement.querySelector('.range-value');
       if (rv) rv.textContent = r0 + 'x';
+    }
+    var rrN = U.getEl('ttsRateNative');
+    if (rrN) {
+      var rN = Number(s.ttsRateNative);
+      if (!rN || rN < 0.5 || rN > 2) rN = 1;
+      rrN.value = rN;
+      var rvN = rrN.parentElement.querySelector('.range-value');
+      if (rvN) rvN.textContent = rN + 'x';
     }
     /* الملف الشخصي في الشريط الجانبي — الاسم الحقيقي، لا "أحمد" الثابتة */
     var pn = U.qs('.profile-name');
@@ -813,9 +841,9 @@
     var targetBadge = U.getEl('storiesTargetLangBadge');
     if (targetBadge) targetBadge.textContent = targetName;
     var targetLabel = U.getEl('storiesTargetLangLabel');
-    if (targetLabel) targetLabel.textContent = (App.t('story') || 'القصة') + ' (' + targetName + ')';
+    if (targetLabel) targetLabel.textContent = (App.t('storyResultTitle') || 'القصة') + ' (' + targetName + ')';
     var nativeLabel = U.getEl('storiesNativeLangLabel');
-    if (nativeLabel) nativeLabel.textContent = (App.t('translation') || 'الترجمة') + ' (' + nativeName + ')';
+    if (nativeLabel) nativeLabel.textContent = (App.t('translationLbl') || 'الترجمة') + ' (' + nativeName + ')';
 
     renderStoriesCefrSelect();
 
@@ -830,17 +858,29 @@
       if (creatorEl) creatorEl.style.display = 'block';
       if (emptyEl) emptyEl.style.display = 'none';
       if (newBtn) newBtn.style.display = 'none';
+      var pt0 = U.getEl('pageTitle');
+      if (pt0) pt0.textContent = App.t('navStories');
+      renderRecentStories();
       return;
     }
+
+    /* إعادة ضبط وضع التعديل إن كان مفتوحاً من عرض سابق (شريط الأدوات وبطاقات القراءة تعود دائماً) */
+    if (App.handlers && App.handlers.exitStoryEditMode) App.handlers.exitStoryEditMode();
 
     if (creatorEl) creatorEl.style.display = 'none';
     if (emptyEl) emptyEl.style.display = 'none';
     if (readerEl) readerEl.style.display = 'block';
     if (newBtn) newBtn.style.display = 'inline-flex';
 
+    /* بطاقة نص القصة (لغة التعلم) تعود دائماً مع القارئ — وضع التعديل كان يخفيها
+       ولا يعيدها أحد فتختفي القصة الهدف من القراءة ويظهر فقط الترجمة والمفردات */
+    var targetCard = U.getEl('storiesTargetCard');
+    if (targetCard) targetCard.style.display = '';
+
     var wc = (story.story || '').split(/\s+/).filter(Boolean).length;
-    var titleEl = U.getEl('storiesViewTitle');
-    if (titleEl) titleEl.textContent = story.title || 'قصة قصيرة';
+    /* العنوان يظهر مرة واحدة فقط — في الشريط العلوي للتطبيق (بلا تكرار داخل القارئ) */
+    var pageTitle = U.getEl('pageTitle');
+    if (pageTitle) pageTitle.textContent = story.title || App.t('navStories');
     var subEl = U.getEl('storiesViewSub');
     if (subEl) subEl.textContent = targetName + ' · ' + U.fmtInt(wc) + ' ' + App.t('wordsUnit') + ' · ' + (p.cefrLevel || 'B1');
 
@@ -914,6 +954,48 @@
     if (App.handlers && App.handlers.applyStoriesViewFontSize) {
       App.handlers.applyStoriesViewFontSize();
     }
+
+    renderRecentStories();
+  }
+
+  /* ═════════ آخر 3 قصص مولّدة — قائمة تُفتح من زر ☰ في عرض القصص فقط
+     (نُقلت من القسم السفلي لطلب المستخدم؛ تُصيَّر في كل مرة يُفتح فيها القسم) */
+  function fmtRecentDate(ts) {
+    try {
+      var loc = (App.state.lang === 'ar') ? 'ar' : (App.state.lang || 'en');
+      var d = new Date(ts);
+      return d.toLocaleDateString(loc, { day: 'numeric', month: 'short' }) + ' · ' +
+        d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return ''; }
+  }
+
+  function renderRecentStories() {
+    /* تُصيَّر في مكانين: القائمة المنسدلة (زر ☰ على الهاتف/الشاشات الضيقة)
+       واللوحة الثابتة يسار عرض القصص (سطح المكتب >1100px) */
+    var host = U.getEl('recentStoriesMenuList');
+    var aside = U.getEl('recentStoriesAsideList');
+    var list = App.state.recentStories || [];
+    var html;
+    if (!list.length) {
+      html = '<div class="recent-stories-empty">' + (App.t('recentStoriesEmpty') || 'لا قصص حديثة بعد — أنشئ قصتك الأولى') + '</div>';
+    } else {
+      var curId = (App.state.lastStory && App.state.lastStory.id) || null;
+      html = list.map(function (s) {
+        var wc = (s.story || '').split(/\s+/).filter(Boolean).length;
+        return '<div class="recent-story-item' + (curId && s.id === curId ? ' active' : '') + '"' +
+          ' data-action="open-recent-story" data-id="' + U.esc(s.id) + '" title="' + App.t('openRecentStory') + '">' +
+          '<div class="recent-story-main">' +
+            '<div class="recent-story-title" dir="auto">' + U.esc(s.title || App.t('storiesEmptyTitle')) + '</div>' +
+            '<div class="recent-story-meta">' + U.fmtInt(wc) + ' ' + App.t('wordsUnit') +
+              (s.createdAt ? ' · ' + fmtRecentDate(s.createdAt) : '') + '</div>' +
+          '</div>' +
+          '<button type="button" class="recent-story-del" data-action="remove-recent-story" data-id="' + U.esc(s.id) +
+            '" title="' + App.t('removeFromRecent') + '">×</button>' +
+        '</div>';
+      }).join('');
+    }
+    if (host) host.innerHTML = html;
+    if (aside) aside.innerHTML = html;
   }
 
   /* ═════════ عرض وتعديل كلمات القسم المختار (Deck Cards Modal) ═════════ */
@@ -1013,7 +1095,7 @@
     renderAll: renderAll, renderHome: renderHome, renderDecks: renderDecks, renderBrowse: renderBrowse,
     renderSearch: renderSearch, renderStats: renderStats, renderBarChart: renderBarChart,
     renderStudyCard: renderStudyCard, renderSessionEnd: renderSessionEnd, renderDeckSelects: renderDeckSelects,
-    renderStoriesView: renderStoriesView, renderDeckCardsList: renderDeckCardsList,
+    renderStoriesView: renderStoriesView, renderDeckCardsList: renderDeckCardsList, renderRecentStories: renderRecentStories,
     fitFrontWord: fitFrontWord,
     renderColorRow: renderColorRow, renderEmojiRow: renderEmojiRow, renderSettings: renderSettings,
     updateLangLabels: updateLangLabels, updateTranslateBtnVisibility: updateTranslateBtnVisibility, fillVoiceSelect: fillVoiceSelect,

@@ -70,7 +70,7 @@ A complete open-source desktop app for language learning and vocabulary memoriza
 | **Frontend** | Vanilla JavaScript (ES6+), HTML5, modern CSS variables (no heavy bundlers) |
 | **Storage Engine** | SQLite 3 via `tauri-plugin-sql` (local `flashki.db` file) with automatic `sql.js WASM` fallback |
 | **Desktop Shell** | Tauri 2 (Rust core) — very lightweight, low RAM usage, high security |
-| **AI Core** | Google Gemini API (2.5 Flash / Flash Lite / Pro) via secure calls from the app core |
+| **AI Core** | Google Gemini API (3.x Flash family with automatic model failover) via secure calls from the app core |
 | **TTS Engine** | High-quality Microsoft Edge TTS + local Web Speech API + Google TTS fallback |
 | **Review Algorithm** | SM-2 Spaced Repetition Algorithm |
 
@@ -143,7 +143,7 @@ flashki-main/
 │   │   ├── handlers.js       # Event and input handling, image compression
 │   │   ├── i18n.js           # Internationalization and auto-translation system
 │   │   └── util.js           # Helpers, Canvas compression, and level calculation
-│   └── i18n/                 # The eight translation files (405 keys per language)
+│   └── i18n/                 # The eight translation files (473 keys per language)
 │       ├── ar.json / en.json / de.json / fr.json
 │       └── es.json / tr.json / fa.json / ur.json
 ├── src-tauri/                # Desktop app core (Rust + Tauri 2)
@@ -163,7 +163,7 @@ flashki-main/
 |---|---|---|
 | 🪟 Windows | ✅ Available (msi / nsis) | Via the GitHub Releases page |
 | 🐧 Linux | ✅ Available (deb / rpm / AppImage) | Via the GitHub Releases page |
-| 🤖 Android | 🔜 **Coming soon, in shaa Allah** | Tauri 2 officially supports Android — the port is in preparation as a future update |
+| 🤖 Android | ✅ Available (apk) | Native WebView wrapper — Android 10+, see [ANDROID.md](ANDROID.md) |
 | 🍎 iOS / macOS | ⏳ Not scheduled for now | Requires building exclusively on a Mac |
 
 ---
