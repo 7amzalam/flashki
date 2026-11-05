@@ -57,6 +57,20 @@ jobs:
           export AJAR="$HOME/sdk/platforms/android-34/android.jar"
           ./android/build-apk.sh release
 
+      # الـ Release ينشئه سير عمل سطح المكتب — ننتظر ظهوره قبل الرفع (سباق التوقيت)
+      - name: Wait for release to exist (tag push)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          found=""
+          for i in $(seq 1 60); do
+            if gh release view "${{ github.ref_name }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then found=1; break; fi
+            echo "release not ready ($i/60) — waiting 30s"
+            sleep 30
+          done
+          if [ -z "$found" ]; then echo "::error::release never appeared"; exit 1; fi
+
       - name: Upload APK to release (tag push)
         if: startsWith(github.ref, 'refs/tags/')
         env:
