@@ -52,10 +52,10 @@ jobs:
           } > android/keystore/KEYS.env
 
       - name: Build signed APK
-        env:
-          BT_DIR: ${{ runner.home }}/sdk/build-tools/35.0.0
-          AJAR: ${{ runner.home }}/sdk/platforms/android-34/android.jar
-        run: ./android/build-apk.sh release
+        run: |
+          export BT_DIR="$HOME/sdk/build-tools/35.0.0"
+          export AJAR="$HOME/sdk/platforms/android-34/android.jar"
+          ./android/build-apk.sh release
 
       - name: Upload APK to release (tag push)
         if: startsWith(github.ref, 'refs/tags/')
