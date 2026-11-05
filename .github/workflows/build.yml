@@ -1,5 +1,11 @@
-name: Build Installers
+name: Release & Build Installers
 
+# ─────────────────────────────────────────────────────────────────────────────
+# دفع وسم v*  → بناء ويندوز + لينكس، توقيعهما، ثم نشر Release عام يحتوي:
+#   المثبّتات (.exe / .msi / .deb / .rpm / .AppImage) + تواقيعها (.sig)
+#   + latest.json — وهو الملف الذي يفحصه التطبيق ليعرض «يتوفر تحديث».
+# تشغيل يدوي (workflow_dispatch) → بناء فقط ورفع Artifacts دون نشر Release.
+# ─────────────────────────────────────────────────────────────────────────────
 on:
   workflow_dispatch:
   push:
@@ -34,6 +40,11 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: 'src-tauri -> target'
+
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
         run: |
@@ -48,16 +59,36 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build Tauri app
+      # نشر إصدار حقيقي: Release + توقيع + latest.json (هذا ما يغذي التحديث التلقائي)
+      - name: Build & publish release (tag push)
+        if: startsWith(github.ref, 'refs/tags/')
         uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Flashki ${{ github.ref_name }}'
+          releaseBody: 'حمّل المثبّت المناسب لنظامك (ويندوز: ‎.exe/-setup أو ‎.msi — لينكس: ‎.AppImage أو ‎.deb أو ‎.rpm). أصحاب الإصدارات السابقة يحصلون على التحديث من داخل التطبيق: الإعدادات ← فحص التحديثات ← فحص الآن.'
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+          args: --bundles ${{ matrix.bundles }}
+
+      # تشغيل يدوي من تبويب Actions: بناء وتوقيع دون نشر — الناتج في Artifacts
+      - name: Build only (manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: --bundles ${{ matrix.bundles }}
-          # هذا الخيار يرفع الملفات كـ Artifacts قابلة للتحميل مباشرة
           uploadWorkflowArtifacts: true
 
-      # خطوة إضافية لضمان رفع الملفات كـ Artifacts باسم واضح
+      # نسخة احتياطية من المثبّتات كـ Artifacts باسم واضح (متاحة في صفحة الـ workflow)
       - name: Upload installers as artifacts
         uses: actions/upload-artifact@v4
         with:

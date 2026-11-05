@@ -1,0 +1,71 @@
+name: Android APK
+
+# ─────────────────────────────────────────────────────────────────────────────
+# بناء حزمة أندرويد (APK) ونشرها مع بقية المثبّتات:
+#   دفع وسم v*      → بناء APK موقّع ورفعه إلى نفس الـ Release الذي ينشئه
+#                     workflow سطح المكتب (flashki-android-vX.Y.Z.apk).
+#   تشغيل يدوي      → بناء ورفع Artifact فقط دون نشر.
+# الأسرار المطلوبة (ملفات android/keystore/):
+#   ANDROID_KEYSTORE_B64 — `base64 flashki-release.jks`
+#   ANDROID_KS_PASS      — كلمة مرور المخزن (KSPASS)
+#   ANDROID_KEY_ALIAS    — الاسم المستعار (flashki)
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # أدوات البناء مباشرة من خوادم جوجل (أسرع من sdkmanager ولا يحتاج تراخيص)
+      - name: Install Android build tools
+        run: |
+          set -e
+          mkdir -p "$HOME/sdk/build-tools/35.0.0" "$HOME/sdk/platforms/android-34"
+          curl -sL -o /tmp/bt.zip https://dl.google.com/android/repository/build-tools_r35_linux.zip
+          unzip -q /tmp/bt.zip -d /tmp/bt
+          mv /tmp/bt/android-*/* "$HOME/sdk/build-tools/35.0.0/"
+          curl -sL -o /tmp/plat.zip https://dl.google.com/android/repository/platform-34-ext7_r03.zip
+          unzip -q /tmp/plat.zip -d /tmp/plat
+          cp /tmp/plat/android-34/android.jar "$HOME/sdk/platforms/android-34/"
+          chmod +x "$HOME/sdk/build-tools/35.0.0/aapt2" "$HOME/sdk/build-tools/35.0.0/zipalign"
+
+      - name: Restore signing keystore
+        run: |
+          set -e
+          mkdir -p android/keystore
+          echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > android/keystore/flashki-release.jks
+          {
+            echo "KSPASS='${{ secrets.ANDROID_KS_PASS }}'"
+            echo "KS_ALIAS='${{ secrets.ANDROID_KEY_ALIAS }}'"
+          } > android/keystore/KEYS.env
+
+      - name: Build signed APK
+        env:
+          BT_DIR: ${{ runner.home }}/sdk/build-tools/35.0.0
+          AJAR: ${{ runner.home }}/sdk/platforms/android-34/android.jar
+        run: ./android/build-apk.sh release
+
+      - name: Upload APK to release (tag push)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" android/dist/*.apk --clobber --repo "$GITHUB_REPOSITORY"
+
+      - name: Upload APK as artifact (manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: flashki-android-apk
+          path: android/dist/*.apk
